@@ -1,199 +1,219 @@
 import { create } from 'zustand';
+import { analyzeTranscript } from '../services/triageEngine';
+import { extractEntityData } from '../services/extractionEngine';
 
-const initialCalls = [
-  { id: 'call_1', callerId: '+1 (555) 019-2834', status: 'ringing', duration: 12, intent: 'Unknown', crmMatch: null },
-  { id: 'call_2', callerId: '+1 (415) 882-9102', status: 'in-progress', duration: 45, intent: 'Invoice Inquiry', crmMatch: 'Acme Corp' },
+const initialDepartments = [
+  { id: 'dept_1', name: 'Sales', color: 'text-emerald-400', icon: 'TrendingUp', description: 'Enterprise acquisition.' },
+  { id: 'dept_2', name: 'Support', color: 'text-cyan-400', icon: 'LifeBuoy', description: 'Technical troubleshooting.' },
+  { id: 'dept_3', name: 'Operations', color: 'text-fuchsia-400', icon: 'Truck', description: 'Logistics management.' },
+  { id: 'dept_4', name: 'Billing', color: 'text-amber-400', icon: 'CreditCard', description: 'Financial compliance.' }
 ];
 
-const initialVoicemails = [
-  { id: 'vm_1', callerId: '+1 (212) 555-0199', duration: 24, transcript: "Hi, this is Sarah from Logistics. I need to update the delivery address for the uniform rental order #4492. Please call me back.", audioUrl: '#', date: new Date(Date.now() - 3600000).toISOString(), crmId: 'cont_8812', autoResponded: true, responseType: 'SMS', archived: false },
-  { id: 'vm_2', callerId: '+1 (305) 555-8812', duration: 15, transcript: "I'm trying to reach support regarding the recent billing discrepancy on my account.", audioUrl: '#', date: new Date(Date.now() - 7200000).toISOString(), crmId: null, autoResponded: false, archived: false },
-];
-
-const initialThreats = [
-  { id: 'thr_1', callerId: '+1 (800) 123-4567', type: 'High Frequency Robocall', location: 'Russia (Proxy)', timestamp: new Date(Date.now() - 1200000).toISOString(), status: 'Auto-Dropped', reputation: 12 },
-  { id: 'thr_2', callerId: '+1 (442) 991-0021', type: 'Social Engineering Pattern', location: 'United States', timestamp: new Date(Date.now() - 4500000).toISOString(), status: 'Flagged', reputation: 45 },
-];
-
-const initialContacts = [
-  { id: 'cont_8812', name: 'Sarah Jenkins', company: 'Logistics Pro', phone: '+1 (212) 555-0199', status: 'Active', lastInteraction: '1 hour ago' },
-  { id: 'cont_9921', name: 'Mark Thompson', company: 'Acme Corp', phone: '+1 (415) 882-9102', status: 'Active', lastInteraction: '45 mins ago' },
-  { id: 'cont_1022', name: 'Elena Rodriguez', company: 'Global Tech', phone: '+1 (305) 555-1212', status: 'Lead', lastInteraction: '2 days ago' },
-];
-
-const initialTemplates = [
-  { id: 'tmp_1', name: 'Callback Confirmation', content: 'Hi, this is AXiM Voice. We received your message regarding [Topic]. An agent will call you back at this number within 15 minutes.', type: 'SMS' },
-  { id: 'tmp_2', name: 'Invoice Resolution', content: 'Hello, regarding your invoice inquiry, we have updated the records in Deskera CRM. You should receive an email confirmation shortly.', type: 'Email' },
-  { id: 'tmp_3', name: 'Support Handoff', content: 'Your message has been escalated to Tier 2 support. Reference ID: AXM-[ID].', type: 'SMS' }
-];
-
-const initialAutoRules = [
-  { id: 'rule_1', name: 'Billing Keyword', trigger: 'invoice, billing, payment', templateId: 'tmp_2', enabled: true },
-  { id: 'rule_2', name: 'Emergency Support', trigger: 'urgent, emergency, broken', templateId: 'tmp_3', enabled: true }
+const initialAgents = [
+  { id: 'agent_1', name: 'Commander Riker', role: 'Human Overseer', status: 'Available', load: 45, node: 'US-EAST-1', metrics: { callsHandled: 142, avgHandlingTime: '4m 12s', resolutionRate: 94.2 }, deptId: 'dept_2' },
+  { id: 'agent_2', name: 'ONYX-AI-01', role: 'AI Agent', status: 'Busy', load: 88, node: 'EU-WEST-2', metrics: { callsHandled: 1240, avgHandlingTime: '1m 05s', resolutionRate: 89.8 }, deptId: 'dept_1' },
 ];
 
 export const useVoiceStore = create((set, get) => ({
-  activeCalls: initialCalls,
-  voicemails: initialVoicemails,
-  threats: initialThreats,
-  crmContacts: initialContacts,
-  templates: initialTemplates,
-  autoRules: initialAutoRules,
-  agentStatus: 'Available',
-  threatMetrics: { blockedToday: 142, estimatedSavings: 24.85 },
-  systemMetrics: {
-    avgWaitTime: '4.2s',
-    aiResolutionRate: '88%',
-    totalMinutes: 12450,
-    activeNodes: 14
-  },
-  auditLogs: [
-    { id: 'log_1', event: 'Firewall Breach Blocked', source: '+7 (900) 123-XX-XX', type: 'security', time: new Date().toISOString() },
-    { id: 'log_2', event: 'CRM Sync Success', source: 'Deskera API', type: 'sync', time: new Date(Date.now() - 300000).toISOString() },
+  activeCalls: [],
+  agents: initialAgents,
+  nodes: [
+    { id: 'node_1', region: 'US-EAST-1', city: 'N. Virginia', health: 98, load: 45, status: 'Online', latency: '12ms', uptime: '99.99%' },
+    { id: 'node_2', region: 'EU-WEST-2', city: 'London', health: 94, load: 72, status: 'Online', latency: '28ms', uptime: '99.95%' },
+    { id: 'node_3', region: 'AP-SOUTH-1', city: 'Mumbai', health: 99, load: 12, status: 'Online', latency: '145ms', uptime: '98.40%' },
   ],
-  selectedCallForIntervention: null,
-  firewallPolicies: {
-    blacklist: ['+1 (800) 555-9999', '+44 20 7946 0000'],
-    whitelist: ['+1 (555) 000-1111'],
-    geoBlocking: ['RU', 'CN', 'KP']
-  },
-  
-  routingSettings: {
-    welcomeMessage: "Thank you for calling AXiM. How can I assist you today?",
-    aiPersona: "Professional Receptionist",
-    forwardingNumber: "+1 (555) 999-0000",
-    firewallSensitivity: 85,
-    autoResponseEnabled: true
-  },
+  nodeAlerts: [],
+  agentAlerts: [],
+  departments: initialDepartments,
+  voicemails: [],
+  entities: [],
+  contextDocuments: [],
+  auditLogs: [],
+  notifications: [],
+  crmProvider: 'Nexus',
+  agentStatus: 'Available',
+  threatMetrics: { blockedToday: 158, estimatedSavings: 32.40, avgThreatScore: 78, highRiskRegions: ['RU', 'CN', 'NG'] },
+  crmHealth: { syncSuccessRate: 99.4, avgLatency: '1.2s', queueDepth: 0, activeConnectors: 2, lastGlobalSync: new Date().toISOString(), providerStatus: { Nexus: 'Operational', Deskera: 'Standby', Salesforce: 'Degraded', HubSpot: 'Operational' } },
+  routingSettings: { autoResponseEnabled: true, globalMute: false },
+  templates: [
+    { id: 't1', name: 'Standard Follow-up', type: 'SMS', content: 'Thanks for reaching out! One of our agents will contact you shortly.' },
+    { id: 't2', name: 'Priority Support', type: 'Email', content: 'We have received your urgent support request. A technician is assigned.' }
+  ],
+  autoRules: [
+    { id: 'rule_1', name: 'Urgent Sales Trigger', trigger: 'pricing', templateId: 't1', actionType: 'SMS_AND_CRM', enabled: true }
+  ],
+  fieldMappings: [
+    { id: 'map_1', source: 'caller_id', target: 'phone_number', transform: 'E.164 Clean', status: 'Valid' },
+  ],
+  messages: [],
 
-  setAgentStatus: (status) => set({ agentStatus: status }),
-  setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
-  
-  archiveVoicemail: (id) => set(state => ({
-    voicemails: state.voicemails.map(v => v.id === id ? { ...v, archived: true } : v)
-  })),
+  // --- CORE ACTIONS ---
+  processInboundVoicemail: (voicemail) => {
+    const analysis = analyzeTranscript(voicemail.transcript);
+    const extraction = extractEntityData(voicemail.transcript);
+    const id = `vm_${Date.now()}`;
+    const time = new Date().toISOString();
+    
+    const newVm = {
+      ...voicemail,
+      ...analysis,
+      id,
+      date: time,
+      actionsTaken: [],
+      archived: false,
+      autoTriaged: true,
+      isManualCorrection: false,
+      summary: extraction.notes,
+      trail: [
+        { id: `tr_1`, event: 'Inbound Transmission Received', type: 'system', detail: `Captured via ${voicemail.node || 'Global-Mesh'}`, time },
+        { id: `tr_2`, event: 'Neural Triage Initiated', type: 'ai', detail: `ONYX-MK4: ${analysis.confidence}% confidence in ${analysis.classification}.`, time },
+        { id: `tr_3`, event: 'Entity Extraction', type: 'ai', detail: `Extracted: ${extraction.name} from ${extraction.company}.`, time }
+      ]
+    };
 
-  deleteVoicemail: (id) => set(state => ({
-    voicemails: state.voicemails.filter(v => v.id !== id)
-  })),
-
-  addAuditLog: (log) => set(state => ({
-    auditLogs: [{ id: `log_${Date.now()}`, ...log, time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50)
-  })),
-
-  updateRouting: (newSettings) => set((state) => ({ 
-    routingSettings: { ...state.routingSettings, ...newSettings } 
-  })),
-
-  addToBlacklist: (number) => {
-    set(state => ({
-      firewallPolicies: { ...state.firewallPolicies, blacklist: [...state.firewallPolicies.blacklist, number] }
+    // Update State
+    set(state => ({ 
+      voicemails: [newVm, ...state.voicemails],
+      entities: extraction.email ? [
+        {
+          id: `ent_${Date.now()}`,
+          name: extraction.name,
+          company: extraction.company,
+          status: 'Lead',
+          sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
+          lastContact: 'Just Now',
+          extractedData: extraction
+        },
+        ...state.entities
+      ] : state.entities
     }));
-    get().addAuditLog({ event: 'Number Blacklisted', source: number, type: 'security' });
+
+    // Trigger Rules
+    get().executeRules(newVm);
   },
 
-  removeFromBlacklist: (number) => set(state => ({
-    firewallPolicies: { ...state.firewallPolicies, blacklist: state.firewallPolicies.blacklist.filter(n => n !== number) }
+  executeRules: (voicemail) => {
+    const { autoRules, templates, routingSettings } = get();
+    if (!routingSettings.autoResponseEnabled) return;
+
+    autoRules.forEach(rule => {
+      if (!rule.enabled) return;
+      
+      const triggerWords = rule.trigger.split(',').map(t => t.trim().toLowerCase());
+      const matches = triggerWords.some(word => voicemail.transcript.toLowerCase().includes(word));
+
+      if (matches) {
+        const template = templates.find(t => t.id === rule.templateId);
+        const actionDetail = `Rule "${rule.name}" triggered: ${rule.actionType}`;
+        
+        get().executeFollowUp(voicemail.id, {
+          id: `act_${Date.now()}`,
+          type: rule.actionType.includes('SMS') ? 'SMS' : 'Email',
+          detail: template ? `Sent: ${template.name}` : 'Automated Sequence Initiated',
+          time: new Date().toISOString(),
+          status: 'completed'
+        });
+
+        get().logEvent(actionDetail, 'sync', 'Automation Engine');
+      }
+    });
+  },
+
+  executeFollowUp: (vmId, action) => set(state => ({
+    voicemails: state.voicemails.map(v => 
+      v.id === vmId ? { ...v, actionsTaken: [action, ...v.actionsTaken] } : v
+    )
   })),
 
-  addTemplate: (template) => set(state => ({ 
-    templates: [...state.templates, { ...template, id: `tmp_${Date.now()}` }] 
+  // --- KNOWLEDGE BASE ---
+  addContextDoc: (doc) => set(state => ({
+    contextDocuments: [{ ...doc, id: `doc_${Date.now()}` }, ...state.contextDocuments]
   })),
 
-  deleteTemplate: (id) => set(state => ({
-    templates: state.templates.filter(t => t.id !== id)
+  deleteContextDoc: (id) => set(state => ({
+    contextDocuments: state.contextDocuments.filter(d => d.id !== id)
   })),
 
-  addAutoRule: (rule) => set(state => ({
-    autoRules: [...state.autoRules, { ...rule, id: `rule_${Date.now()}`, enabled: true }]
-  })),
+  // --- AGENT & NODE ACTIONS ---
+  generateAgentAlert: (agentId, load) => {
+    const agent = get().agents.find(a => a.id === agentId);
+    if (!agent) return;
 
-  deleteAutoRule: (id) => set(state => ({
-    autoRules: state.autoRules.filter(r => r.id !== id)
-  })),
+    const newAlert = {
+      id: `alert_agent_${Date.now()}`,
+      agentId,
+      agentName: agent.name,
+      load,
+      type: 'Resource Critical',
+      timestamp: new Date().toISOString()
+    };
 
-  toggleAutoRule: (id) => set(state => ({
-    autoRules: state.autoRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r)
-  })),
+    set(state => ({ 
+      agentAlerts: [newAlert, ...state.agentAlerts],
+      auditLogs: [{ id: Date.now(), event: `Critical Load Alert: ${agent.name} (${load}%)`, type: 'security', source: 'Load Balancer', time: new Date().toISOString() }, ...state.auditLogs]
+    }));
+  },
 
+  clearAgentAlert: (id) => set(state => ({ agentAlerts: state.agentAlerts.filter(a => a.id !== id) })),
+
+  rebalanceAgent: (agentId) => {
+    set(state => ({
+      agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available' } : a),
+      agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId)
+    }));
+  },
+
+  // --- SIMULATION ---
   subscribeToTelephonyNetwork: () => {
     const interval = setInterval(() => {
-      const { activeCalls, routingSettings, autoRules, templates } = get();
-      const updatedCalls = activeCalls.map(c => ({ ...c, duration: c.duration + 1 }));
+      const { activeCalls, agents } = get();
       
-      const resolvedCalls = updatedCalls.map(c => 
-        c.status === 'ringing' && Math.random() > 0.8 
-          ? { ...c, status: 'in-progress', intent: 'Scheduling' } 
-          : c
-      );
+      // Random Load Fluctuations
+      const updatedAgents = agents.map(agent => ({
+        ...agent,
+        load: Math.min(Math.max(agent.load + (Math.floor(Math.random() * 8) - 3), 0), 100)
+      }));
+      set({ agents: updatedAgents });
 
-      const filteredCalls = resolvedCalls.filter(c => 
-        !(c.status === 'in-progress' && Math.random() > 0.98)
-      );
-
-      // Randomly generate new voicemail
-      if (Math.random() > 0.98) {
-        const id = `vm_${Date.now()}`;
-        const transcripts = [
-          "I have an issue with the latest invoice I received.",
-          "Emergency, the system is down at our main branch.",
-          "Just calling to say hello and check in on the team.",
-        ];
-        const transcript = transcripts[Math.floor(Math.random() * transcripts.length)];
-        
-        let autoResponded = false;
-        let responseType = null;
-
-        if (routingSettings.autoResponseEnabled) {
-          const matchingRule = autoRules.find(r => 
-            r.enabled && r.trigger.split(',').some(kw => transcript.toLowerCase().includes(kw.trim().toLowerCase()))
-          );
-          if (matchingRule) {
-            autoResponded = true;
-            responseType = templates.find(t => t.id === matchingRule.templateId)?.type || 'SMS';
-            get().addAuditLog({ event: 'AI Auto-Response Sent', source: responseType, type: 'sync' });
-          }
-        }
-
-        const newVM = {
+      // Inbound Call Simulation
+      if (Math.random() > 0.92 && activeCalls.length < 5) {
+        const id = `call_${Date.now()}`;
+        const newCall = {
           id,
-          callerId: `+1 (${Math.floor(Math.random() * 900) + 100}) 555-${Math.floor(Math.random() * 9000) + 1000}`,
-          duration: Math.floor(Math.random() * 40) + 5,
-          transcript,
-          audioUrl: '#',
-          date: new Date().toISOString(),
-          crmId: Math.random() > 0.5 ? 'cont_auto' : null,
-          autoResponded,
-          responseType,
-          archived: false
-        };
-
-        set(state => ({ voicemails: [newVM, ...state.voicemails] }));
-      }
-
-      if (Math.random() > 0.9 && filteredCalls.length < 5) {
-        filteredCalls.push({
-          id: `call_${Date.now()}`,
-          callerId: `+1 (${Math.floor(Math.random() * 900) + 100}) 555-${Math.floor(Math.random() * 9000) + 1000}`,
-          status: 'ringing',
+          callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
+          status: 'active',
+          intent: 'Connecting...',
           duration: 0,
-          intent: 'Routing...',
-          crmMatch: Math.random() > 0.5 ? 'Unknown Contact' : 'Verified Partner'
-        });
+          node: 'US-EAST-1',
+          messages: [{ id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. Routing to node...' }],
+          sentiment: 'neutral'
+        };
+        set(state => ({ activeCalls: [...state.activeCalls, newCall] }));
       }
-
-      set({ activeCalls: filteredCalls });
-
-      if (Math.random() > 0.95) {
-        set(state => ({
-          threatMetrics: {
-            blockedToday: state.threatMetrics.blockedToday + 1,
-            estimatedSavings: state.threatMetrics.estimatedSavings + 0.15
-          }
-        }));
-      }
-    }, 1000);
-
+      
+      set(state => ({
+        activeCalls: state.activeCalls.map(call => ({ ...call, duration: call.duration + 1 })).filter(call => call.duration < 120)
+      }));
+    }, 4000);
     return () => clearInterval(interval);
-  }
+  },
+
+  // --- HELPERS ---
+  addNotification: (n) => set(state => ({ notifications: [{ id: Date.now(), ...n, time: new Date() }, ...state.notifications].slice(0, 5) })),
+  removeNotification: (id) => set(state => ({ notifications: state.notifications.filter(n => n.id !== id) })),
+  logEvent: (event, type = 'info', source = 'System') => set(state => ({ auditLogs: [{ id: Date.now(), event, type, source, time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50) })),
+  addAgent: (agent) => set(state => ({ agents: [...state.agents, { ...agent, id: `agent_${Date.now()}`, status: 'Available', load: 0, metrics: { resolutionRate: 0, callsHandled: 0, avgHandlingTime: '0s' } }] })),
+  updateAgentDept: (agentId, deptId) => set(state => ({ agents: state.agents.map(a => a.id === agentId ? { ...a, deptId } : a) })),
+  updateRouting: (settings) => set(state => ({ routingSettings: { ...state.routingSettings, ...settings } })),
+  addAutoRule: (rule) => set(state => ({ autoRules: [{ ...rule, id: `rule_${Date.now()}`, enabled: true }, ...state.autoRules] })),
+  deleteAutoRule: (id) => set(state => ({ autoRules: state.autoRules.filter(r => r.id !== id) })),
+  toggleAutoRule: (id) => set(state => ({ autoRules: state.autoRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
+  sendMessage: (text) => set(state => ({ messages: [...state.messages, { id: Date.now(), senderId: 'agent_1', text, time: new Date().toISOString(), type: 'user' }] })),
+  archiveVoicemail: (id) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, archived: true } : v) })),
+  deleteVoicemail: (id) => set(state => ({ voicemails: state.voicemails.filter(v => v.id !== id) })),
+  updateVoicemailPriority: (id, priority) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, priority } : v) })),
+  updateVoicemailClassification: (id, classification) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
+  bulkUpdateClassification: (ids, classification) => set(state => ({ voicemails: state.voicemails.map(v => ids.includes(v.id) ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
+  setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
+  seizeCall: (id) => set(state => ({ activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c) })),
 }));

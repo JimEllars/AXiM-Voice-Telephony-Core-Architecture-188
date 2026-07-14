@@ -1,190 +1,201 @@
 import React, { useState } from 'react';
 import { useVoiceStore } from '../store/useVoiceStore';
 import SafeIcon from '../common/SafeIcon';
-import { FiShield, FiAlertOctagon, FiCheckCircle, FiMoreVertical, FiFilter, FiSlash, FiTarget, FiPlus, FiX } from 'react-icons/fi';
+import { FiShield, FiAlertOctagon, FiPlus, FiGlobe, FiEye, FiSearch, FiSliders, FiActivity, FiCheckCircle } from 'react-icons/fi';
 import { Badge } from '../components/common/Badge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FirewallRuleCard } from '../components/security/FirewallRuleCard';
+import { ThreatRadar } from '../components/security/ThreatRadar';
+import { ThreatDetailsModal } from '../components/security/ThreatDetailsModal';
 
 export const AsguardFirewall = () => {
-  const { threats, threatMetrics, firewallPolicies, addToBlacklist, removeFromBlacklist } = useVoiceStore();
-  const [activeTab, setActiveTab] = useState('threats');
-  const [newBlacklist, setNewBlacklist] = useState('');
+  const { threats, threatMetrics, firewallRules, addFirewallRule, whitelistNumber } = useVoiceStore();
+  const [activeTab, setActiveTab] = useState('radar');
+  const [selectedThreat, setSelectedThreat] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newRule, setNewRule] = useState({ name: '', description: '', type: 'Heuristic', action: 'Drop', target: 'Global' });
 
-  const handleAddBlacklist = (e) => {
+  const handleCreateRule = (e) => {
     e.preventDefault();
-    if (!newBlacklist) return;
-    addToBlacklist(newBlacklist);
-    setNewBlacklist('');
+    addFirewallRule(newRule);
+    setShowAddModal(false);
+    setNewRule({ name: '', description: '', type: 'Heuristic', action: 'Drop', target: 'Global' });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
-            <SafeIcon icon={FiShield} className="text-fuchsia-500" /> Asguard Edge Firewall
+            <SafeIcon icon={FiShield} className="text-indigo-500" /> Asguard Edge Firewall
           </h1>
-          <p className="text-zinc-500 text-sm mt-1">Real-time threat mitigation and robocall interception.</p>
+          <p className="text-zinc-500 text-sm mt-1">AI-driven perimeter defense for the AXiM telephony mesh.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm font-medium hover:bg-zinc-800 transition-colors flex items-center gap-2">
-            <SafeIcon icon={FiFilter} /> Filters
-          </button>
-          <button className="px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-fuchsia-500/20">
-            Export Threat Log
-          </button>
-        </div>
+        <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-2">
+          <SafeIcon icon={FiPlus} /> Create Security Policy
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
-          <div className="text-zinc-500 text-xs uppercase font-mono tracking-widest mb-1">Blocked Today</div>
-          <div className="text-3xl font-bold text-zinc-100">{threatMetrics.blockedToday}</div>
-          <div className="mt-2 text-emerald-400 text-xs flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active Protection
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800">
+          <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Total Blocks Today</div>
+          <div className="text-2xl font-bold text-zinc-100">{threatMetrics.blockedToday}</div>
         </div>
-        <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
-          <div className="text-zinc-500 text-xs uppercase font-mono tracking-widest mb-1">Carrier Savings</div>
-          <div className="text-3xl font-bold text-zinc-100">${threatMetrics.estimatedSavings.toFixed(2)}</div>
-          <div className="mt-2 text-zinc-500 text-xs">Based on $0.15 avg talk time</div>
+        <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800">
+          <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Active Policies</div>
+          <div className="text-2xl font-bold text-indigo-400">{firewallRules.filter(r => r.enabled).length}</div>
         </div>
-        <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
-          <div className="text-zinc-500 text-xs uppercase font-mono tracking-widest mb-1">Threat Level</div>
-          <div className="text-3xl font-bold text-amber-500">MODERATE</div>
-          <div className="mt-2 text-zinc-500 text-xs">Elevated robocall activity</div>
+        <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800">
+          <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Avg Threat Score</div>
+          <div className="text-2xl font-bold text-rose-500">{threatMetrics.avgThreatScore}</div>
+        </div>
+        <div className="bg-zinc-900/50 p-5 rounded-xl border border-zinc-800">
+          <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mb-1">Carrier Savings</div>
+          <div className="text-2xl font-bold text-emerald-400">${threatMetrics.estimatedSavings.toFixed(2)}</div>
         </div>
       </div>
 
       <div className="flex border-b border-zinc-800 gap-6">
-        <button 
-          onClick={() => setActiveTab('threats')}
-          className={`pb-3 text-sm font-medium transition-colors relative ${activeTab === 'threats' ? 'text-fuchsia-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Recent Interceptions
-          {activeTab === 'threats' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-400" />}
-        </button>
-        <button 
-          onClick={() => setActiveTab('policies')}
-          className={`pb-3 text-sm font-medium transition-colors relative ${activeTab === 'policies' ? 'text-fuchsia-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Firewall Policies
-          {activeTab === 'policies' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-fuchsia-400" />}
-        </button>
+        {['radar', 'rules', 'ledger'].map(tab => (
+          <button 
+            key={tab} 
+            onClick={() => setActiveTab(tab)} 
+            className={`pb-3 text-sm font-bold transition-colors relative uppercase tracking-widest ${activeTab === tab ? 'text-indigo-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            {tab} {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
+          </button>
+        ))}
       </div>
 
       <AnimatePresence mode="wait">
-        {activeTab === 'threats' ? (
-          <motion.div 
-            key="threats"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl overflow-hidden backdrop-blur-sm"
-          >
-            <div className="px-5 py-4 border-b border-zinc-800/80">
-              <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-                <SafeIcon icon={FiAlertOctagon} className="text-rose-500" /> Blocked Transmission Log
-              </h2>
+        {activeTab === 'radar' ? (
+          <motion.div key="radar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 bg-zinc-900/40 border border-zinc-800 rounded-3xl p-8 flex flex-col items-center justify-center">
+              <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-[0.2em] mb-8 italic">Neural Perimeter Scan</h3>
+              <ThreatRadar threats={threats} />
+              <div className="mt-8 grid grid-cols-2 gap-4 w-full">
+                <div className="text-center p-3 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <p className="text-[10px] text-zinc-500 font-bold mb-1">SENSORS</p>
+                  <p className="text-xs font-mono text-emerald-400 uppercase">Optimized</p>
+                </div>
+                <div className="text-center p-3 bg-zinc-950 rounded-xl border border-zinc-800">
+                  <p className="text-[10px] text-zinc-500 font-bold mb-1">LATENCY</p>
+                  <p className="text-xs font-mono text-cyan-400 uppercase">2ms</p>
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
+                <SafeIcon icon={FiActivity} className="text-rose-500" /> Recent Neutralized Targets
+              </h3>
+              {threats.slice(0, 6).map(threat => (
+                <div key={threat.id} className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${threat.score > 90 ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                      <SafeIcon icon={FiAlertOctagon} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-zinc-200">{threat.callerId}</span>
+                        <Badge variant="danger" className="text-[8px]">{threat.score} RISK</Badge>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-mono mt-0.5 uppercase tracking-widest">{threat.type} • ORIGIN: {threat.region}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedThreat(threat)} className="p-2 text-zinc-600 hover:text-indigo-400 bg-zinc-800/50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                    <SafeIcon icon={FiEye} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        ) : activeTab === 'rules' ? (
+          <motion.div key="rules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {firewallRules.map(rule => <FirewallRuleCard key={rule.id} rule={rule} />)}
+          </motion.div>
+        ) : (
+          <motion.div key="ledger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
+             <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/60">
+              <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2 uppercase tracking-widest italic">
+                <SafeIcon icon={FiAlertOctagon} className="text-rose-500" /> Blocked Transmissions
+              </h3>
+              <div className="relative">
+                <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input type="text" placeholder="Filter threats..." className="bg-zinc-950/50 border border-zinc-800 rounded-lg pl-9 pr-4 py-1.5 text-xs w-64 focus:outline-none focus:border-indigo-500/50" />
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-900/80 text-zinc-400 uppercase text-[10px] tracking-wider font-mono border-b border-zinc-800/50">
+                <thead className="bg-zinc-900/80 text-zinc-500 uppercase text-[10px] tracking-widest font-bold">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Source Number</th>
-                    <th className="px-5 py-3 font-medium">Classification</th>
-                    <th className="px-5 py-3 font-medium">Origin</th>
-                    <th className="px-5 py-3 font-medium">Timestamp</th>
-                    <th className="px-5 py-3 font-medium">Action</th>
-                    <th className="px-5 py-3 font-medium text-right"></th>
+                    <th className="px-6 py-4">Source Number</th>
+                    <th className="px-6 py-4">Classification</th>
+                    <th className="px-6 py-4">Risk Score</th>
+                    <th className="px-6 py-4">Origin</th>
+                    <th className="px-6 py-4">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50">
-                  {threats.map((threat) => (
-                    <motion.tr key={threat.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-5 py-4 font-medium text-zinc-200">{threat.callerId}</td>
-                      <td className="px-5 py-4">
-                        <Badge variant="danger">
-                          {threat.type}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-4 text-zinc-400">{threat.location}</td>
-                      <td className="px-5 py-4 text-zinc-500 font-mono text-xs">
-                        {new Date(threat.timestamp).toLocaleTimeString()}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 text-emerald-400">
-                          <SafeIcon icon={FiCheckCircle} className="text-xs" />
-                          <span className="text-xs uppercase font-bold tracking-tighter">Auto-Dropped</span>
+                  {threats.map(threat => (
+                    <tr key={threat.id} className="hover:bg-indigo-500/5 transition-colors cursor-pointer" onClick={() => setSelectedThreat(threat)}>
+                      <td className="px-6 py-4 font-mono text-zinc-200">{threat.callerId}</td>
+                      <td className="px-6 py-4"><Badge variant="danger">{threat.type}</Badge></td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500" style={{ width: `${threat.score}%` }} />
+                          </div>
+                          <span className="text-[10px] font-mono text-rose-400">{threat.score}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right">
-                        <button className="p-1 hover:bg-zinc-800 rounded text-zinc-500">
-                          <SafeIcon icon={FiMoreVertical} />
-                        </button>
+                      <td className="px-6 py-4 text-zinc-400">{threat.region}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase">
+                          <SafeIcon icon={FiCheckCircle} /> Auto-Dropped
+                        </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </motion.div>
-        ) : (
-          <motion.div 
-            key="policies"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
-          >
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2 mb-4">
-                <SafeIcon icon={FiSlash} className="text-rose-500" /> Active Blacklist
-              </h3>
-              <form onSubmit={handleAddBlacklist} className="flex gap-2 mb-4">
-                <input 
-                  type="text" 
-                  placeholder="Enter number to block..." 
-                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-100 focus:outline-none focus:border-rose-500/50"
-                  value={newBlacklist}
-                  onChange={e => setNewBlacklist(e.target.value)}
-                />
-                <button className="p-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-lg hover:bg-rose-500/20">
-                  <SafeIcon icon={FiPlus} />
-                </button>
-              </form>
-              <div className="space-y-2">
-                {firewallPolicies.blacklist.map(number => (
-                  <div key={number} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-zinc-800 group">
-                    <span className="text-sm font-mono text-zinc-300">{number}</span>
-                    <button 
-                      onClick={() => removeFromBlacklist(number)}
-                      className="text-zinc-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <SafeIcon icon={FiX} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2 mb-4">
-                <SafeIcon icon={FiTarget} className="text-cyan-500" /> SIP Whitelist
-              </h3>
-              <p className="text-xs text-zinc-500 italic mb-4">Verified partners bypass all firewall processing.</p>
-              <div className="space-y-2">
-                {firewallPolicies.whitelist.map(number => (
-                  <div key={number} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg border border-zinc-800">
-                    <span className="text-sm font-mono text-zinc-300">{number}</span>
-                    <Badge variant="cyber">Verified</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
+
+      {selectedThreat && (
+        <ThreatDetailsModal 
+          threat={selectedThreat} 
+          onClose={() => setSelectedThreat(null)} 
+          onWhitelist={(num) => {
+            whitelistNumber(num);
+            setSelectedThreat(null);
+          }}
+        />
+      )}
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                <SafeIcon icon={FiSliders} className="text-indigo-400" /> Define Security Policy
+              </h3>
+              <button onClick={() => setShowAddModal(false)} className="text-zinc-500 hover:text-zinc-100"><SafeIcon icon={FiAlertOctagon} /></button>
+            </div>
+            <form onSubmit={handleCreateRule} className="p-6 space-y-4">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1.5 block">Policy Name</label>
+                <input required placeholder="e.g. Regional Compliance Block" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50" value={newRule.name} onChange={e => setNewRule({ ...newRule, name: e.target.value })} />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-3 border border-zinc-800 rounded-xl text-sm font-bold text-zinc-400 hover:bg-zinc-800 transition-all">Discard</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-900/40 transition-all">Deploy Policy</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
