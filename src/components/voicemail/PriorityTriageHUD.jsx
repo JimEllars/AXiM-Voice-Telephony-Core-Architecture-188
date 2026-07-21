@@ -15,10 +15,10 @@ export const PriorityTriageHUD = () => {
   };
 
   const cards = [
-    { label: 'Critical Triage', count: stats.urgent, icon: FiAlertTriangle, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
-    { label: 'High Priority', count: stats.high, icon: FiZap, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-    { label: 'Standard', count: stats.low, icon: FiClock, color: 'text-zinc-400', bg: 'bg-zinc-800/50', border: 'border-zinc-700/50' },
-    { label: 'Resolved/Vaulted', count: stats.resolved, icon: FiCheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' }
+    { label: 'Critical Triage', count: stats.urgent, icon: FiAlertTriangle, color: 'text-fuchsia-500', bg: 'bg-zinc-900', border: 'border-fuchsia-500/50' },
+    { label: 'High Priority', count: stats.high, icon: FiZap, color: 'text-cyan-500', bg: 'bg-zinc-900', border: 'border-cyan-500/50' },
+    { label: 'Standard', count: stats.low, icon: FiClock, color: 'text-zinc-400', bg: 'bg-zinc-900', border: 'border-zinc-700' },
+    { label: 'Resolved/Vaulted', count: stats.resolved, icon: FiCheckCircle, color: 'text-emerald-400', bg: 'bg-zinc-900', border: 'border-emerald-500/30' }
   ];
 
   return (
