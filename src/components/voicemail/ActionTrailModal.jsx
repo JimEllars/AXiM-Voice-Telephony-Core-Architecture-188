@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
 import { FiX, FiActivity, FiCpu, FiRefreshCw, FiShield, FiClock, FiFileText } from 'react-icons/fi';
@@ -14,8 +14,27 @@ const TypeIcon = ({ type }) => {
 };
 
 export const ActionTrailModal = ({ voicemail, onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+
+    };
+  }, [onClose]);
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex justify-end">
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex justify-end" onClick={handleBackdropClick}>
       <motion.div 
         initial={{ x: '100%' }}
         animate={{ x: 0 }}

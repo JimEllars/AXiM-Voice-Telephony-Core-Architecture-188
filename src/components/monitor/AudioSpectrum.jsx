@@ -1,14 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 export const AudioSpectrum = ({ isActive }) => {
   const [bars, setBars] = useState(new Array(20).fill(2));
+  const requestRef = useRef();
+  const lastUpdateRef = useRef(0);
+
+  const animate = (time) => {
+    if (time - lastUpdateRef.current > 100) {
+      setBars(prev => prev.map(() => Math.floor(Math.random() * 20) + 2));
+      lastUpdateRef.current = time;
+    }
+    requestRef.current = requestAnimationFrame(animate);
+  };
 
   useEffect(() => {
-    if (!isActive) return;
-    const interval = setInterval(() => {
-      setBars(prev => prev.map(() => Math.floor(Math.random() * 20) + 2));
-    }, 100);
-    return () => clearInterval(interval);
+    if (isActive) {
+      requestRef.current = requestAnimationFrame(animate);
+    } else {
+      setBars(new Array(20).fill(2));
+    }
+    return () => cancelAnimationFrame(requestRef.current);
   }, [isActive]);
 
   return (

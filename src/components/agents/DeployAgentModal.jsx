@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
 import { FiX, FiCpu, FiUser, FiZap, FiLayers } from 'react-icons/fi';
 import { useVoiceStore } from '../../store/useVoiceStore';
 
 export const DeployAgentModal = ({ onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      setForm({ name: '', role: 'AI Agent', node: 'US-EAST-1', deptId: 'dept_1' });
+    };
+  }, [onClose]);
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   const { addAgent, nodes, departments } = useVoiceStore();
   const [form, setForm] = useState({ 
     name: '', 
@@ -20,7 +39,7 @@ export const DeployAgentModal = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={handleBackdropClick}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }} 
         animate={{ opacity: 1, scale: 1 }} 

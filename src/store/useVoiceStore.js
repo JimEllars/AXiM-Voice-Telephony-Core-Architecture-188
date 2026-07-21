@@ -34,6 +34,8 @@ export const useVoiceStore = create((set, get) => ({
   agentStatus: 'Available',
   threatMetrics: { blockedToday: 158, estimatedSavings: 32.40, avgThreatScore: 78, highRiskRegions: ['RU', 'CN', 'NG'] },
   crmHealth: { syncSuccessRate: 99.4, avgLatency: '1.2s', queueDepth: 0, activeConnectors: 2, lastGlobalSync: new Date().toISOString(), providerStatus: { Nexus: 'Operational', Deskera: 'Standby', Salesforce: 'Degraded', HubSpot: 'Operational' } },
+  connectionStatus: 'connected',
+  latency: 45,
   routingSettings: { autoResponseEnabled: true, globalMute: false },
   templates: [
     { id: 't1', name: 'Standard Follow-up', type: 'SMS', content: 'Thanks for reaching out! One of our agents will contact you shortly.' },
@@ -49,47 +51,51 @@ export const useVoiceStore = create((set, get) => ({
 
   // --- CORE ACTIONS ---
   processInboundVoicemail: (voicemail) => {
-    const analysis = analyzeTranscript(voicemail.transcript);
-    const extraction = extractEntityData(voicemail.transcript);
-    const id = `vm_${Date.now()}`;
-    const time = new Date().toISOString();
-    
-    const newVm = {
-      ...voicemail,
-      ...analysis,
-      id,
-      date: time,
-      actionsTaken: [],
-      archived: false,
-      autoTriaged: true,
-      isManualCorrection: false,
-      summary: extraction.notes,
-      trail: [
-        { id: `tr_1`, event: 'Inbound Transmission Received', type: 'system', detail: `Captured via ${voicemail.node || 'Global-Mesh'}`, time },
-        { id: `tr_2`, event: 'Neural Triage Initiated', type: 'ai', detail: `ONYX-MK4: ${analysis.confidence}% confidence in ${analysis.classification}.`, time },
-        { id: `tr_3`, event: 'Entity Extraction', type: 'ai', detail: `Extracted: ${extraction.name} from ${extraction.company}.`, time }
-      ]
-    };
+    try {
+      const analysis = analyzeTranscript(voicemail.transcript);
+      const extraction = extractEntityData(voicemail.transcript);
+      const id = `vm_${Date.now()}`;
+      const time = new Date().toISOString();
 
-    // Update State
-    set(state => ({ 
-      voicemails: [newVm, ...state.voicemails],
-      entities: extraction.email ? [
-        {
-          id: `ent_${Date.now()}`,
-          name: extraction.name,
-          company: extraction.company,
-          status: 'Lead',
-          sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
-          lastContact: 'Just Now',
-          extractedData: extraction
-        },
-        ...state.entities
-      ] : state.entities
-    }));
+      const newVm = {
+        ...voicemail,
+        ...analysis,
+        id,
+        date: time,
+        actionsTaken: [],
+        archived: false,
+        autoTriaged: true,
+        isManualCorrection: false,
+        summary: extraction.notes,
+        trail: [
+          { id: `tr_1`, event: 'Inbound Transmission Received', type: 'system', detail: `Captured via ${voicemail.node || 'Global-Mesh'}`, time },
+          { id: `tr_2`, event: 'Neural Triage Initiated', type: 'ai', detail: `ONYX-MK4: ${analysis.confidence}% confidence in ${analysis.classification}.`, time },
+          { id: `tr_3`, event: 'Entity Extraction', type: 'ai', detail: `Extracted: ${extraction.name} from ${extraction.company}.`, time }
+        ]
+      };
 
-    // Trigger Rules
-    get().executeRules(newVm);
+      // Update State
+      set(state => ({
+        voicemails: [newVm, ...state.voicemails],
+        entities: extraction.email ? [
+          {
+            id: `ent_${Date.now()}`,
+            name: extraction.name,
+            company: extraction.company,
+            status: 'Lead',
+            sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
+            lastContact: 'Just Now',
+            extractedData: extraction
+          },
+          ...state.entities
+        ] : state.entities
+      }));
+
+      // Trigger Rules
+      get().executeRules(newVm);
+    } catch (error) {
+      get().addNotification({ type: 'error', title: 'Processing Error', message: error.message || 'Failed to process inbound transmission' });
+    }
   },
 
   executeRules: (voicemail) => {
@@ -165,35 +171,78 @@ export const useVoiceStore = create((set, get) => ({
 
   // --- SIMULATION ---
   subscribeToTelephonyNetwork: () => {
-    const interval = setInterval(() => {
-      const { activeCalls, agents } = get();
-      
-      // Random Load Fluctuations
-      const updatedAgents = agents.map(agent => ({
-        ...agent,
-        load: Math.min(Math.max(agent.load + (Math.floor(Math.random() * 8) - 3), 0), 100)
-      }));
-      set({ agents: updatedAgents });
+    let reconnectAttempts = 0;
+    const maxBackoff = 30000;
 
-      // Inbound Call Simulation
-      if (Math.random() > 0.92 && activeCalls.length < 5) {
-        const id = `call_${Date.now()}`;
-        const newCall = {
-          id,
-          callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
-          status: 'active',
-          intent: 'Connecting...',
-          duration: 0,
-          node: 'US-EAST-1',
-          messages: [{ id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. Routing to node...' }],
-          sentiment: 'neutral'
-        };
-        set(state => ({ activeCalls: [...state.activeCalls, newCall] }));
+    const connect = () => {
+      try {
+        set({ connectionStatus: 'reconnecting' });
+
+        // Mock connection delay
+        setTimeout(() => {
+          set({ connectionStatus: 'connected' });
+          reconnectAttempts = 0;
+          get().addNotification({ type: 'success', title: 'Mesh Connected', message: 'Realtime telemetry active' });
+        }, 1000);
+      } catch (error) {
+        set({ connectionStatus: 'offline' });
+        get().addNotification({ type: 'error', title: 'Connection Failed', message: error.message });
       }
+    };
+
+    connect();
+
+    const interval = setInterval(() => {
+      const { activeCalls, agents, connectionStatus } = get();
       
-      set(state => ({
-        activeCalls: state.activeCalls.map(call => ({ ...call, duration: call.duration + 1 })).filter(call => call.duration < 120)
-      }));
+      if (connectionStatus !== 'connected') return;
+
+      try {
+        // Random Load Fluctuations
+        const updatedAgents = agents.map(agent => ({
+          ...agent,
+          load: Math.min(Math.max(agent.load + (Math.floor(Math.random() * 8) - 3), 0), 100)
+        }));
+
+        // Latency jitter
+        const currentLatency = get().latency;
+        const newLatency = Math.max(10, Math.min(800, currentLatency + (Math.floor(Math.random() * 40) - 20)));
+
+        set({ agents: updatedAgents, latency: newLatency });
+
+        // Simulate random disconnects for fault tolerance testing
+        if (Math.random() > 0.98) {
+          set({ connectionStatus: 'offline' });
+          get().addNotification({ type: 'error', title: 'Connection Lost', message: 'Attempting to reconnect...' });
+
+          reconnectAttempts++;
+          const backoff = Math.min(1000 * Math.pow(2, reconnectAttempts), maxBackoff);
+          setTimeout(connect, backoff);
+          return;
+        }
+
+        // Inbound Call Simulation
+        if (Math.random() > 0.92 && activeCalls.length < 5) {
+          const id = `call_${Date.now()}`;
+          const newCall = {
+            id,
+            callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
+            status: 'active',
+            intent: 'Connecting...',
+            duration: 0,
+            node: 'US-EAST-1',
+            messages: [{ id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. Routing to node...' }],
+            sentiment: 'neutral'
+          };
+          set(state => ({ activeCalls: [...state.activeCalls, newCall] }));
+        }
+
+        set(state => ({
+          activeCalls: state.activeCalls.map(call => ({ ...call, duration: call.duration + 1 })).filter(call => call.duration < 120)
+        }));
+      } catch (error) {
+        get().addNotification({ type: 'error', title: 'Telemetry Error', message: 'Failed to sync telemetry data' });
+      }
     }, 4000);
     return () => clearInterval(interval);
   },
