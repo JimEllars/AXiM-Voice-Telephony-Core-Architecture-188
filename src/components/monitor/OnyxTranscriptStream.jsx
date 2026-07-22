@@ -7,7 +7,7 @@ import { useVoiceStore } from '../../store/useVoiceStore';
 import { AudioSpectrum } from './AudioSpectrum';
 
 export const OnyxTranscriptStream = ({ call, onClose }) => {
-  const { seizeCall } = useVoiceStore();
+  const { seizeCall, addNotification, logEvent } = useVoiceStore();
   const [messages, setMessages] = useState([
     { id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. How can I assist you today?' }
   ]);
@@ -36,6 +36,7 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
 
   const handleSeize = () => {
     seizeCall(call.id);
+    addNotification({ type: 'success', title: 'Transfer Bridge Active', message: 'Warm transfer bridge confirmed.' });
   };
 
   return (
@@ -115,7 +116,14 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
               <button 
-                onClick={() => setIsMuted(!isMuted)}
+                onClick={() => {
+                const newMuted = !isMuted;
+                setIsMuted(newMuted);
+                if (!newMuted) {
+                  logEvent('Call Override Initiated by Operator', 'security', 'Voice Cockpit');
+                  addNotification({ type: 'success', title: 'Local Mic Active', message: 'Warm transfer bridge confirmed.' });
+                }
+              }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${isMuted ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
               >
                 <SafeIcon icon={isMuted ? FiMicOff : FiMic} />

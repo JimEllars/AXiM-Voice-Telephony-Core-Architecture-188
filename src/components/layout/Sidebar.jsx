@@ -4,12 +4,10 @@ import SafeIcon from '../../common/SafeIcon';
 import { FiActivity, FiVoicemail, FiShield, FiSettings, FiShare2, FiZap, FiBarChart2, FiUsers, FiGlobe, FiDatabase, FiMessageSquare, FiRadio } from 'react-icons/fi';
 import { useVoiceStore } from '../../store/useVoiceStore';
 
-export const Sidebar = () => {
-  const { voicemails, activeCalls } = useVoiceStore();
+export const getNavItems = (voicemails, activeCalls) => {
   const unreadCount = voicemails.filter(v => !v.archived).length;
   const liveCount = activeCalls.length;
-
-  const navItems = [
+  return [
     { path: '/', label: 'Command Center', icon: FiActivity },
     { path: '/live', label: 'Live Monitor', icon: FiRadio, badge: liveCount > 0 ? liveCount.toString() : null, badgeVariant: 'success' },
     { path: '/voicemails', label: 'Intelligence Vault', icon: FiVoicemail, badge: unreadCount > 0 ? unreadCount.toString() : null },
@@ -24,6 +22,11 @@ export const Sidebar = () => {
     { path: '/crm-sync', label: 'Node Config', icon: FiShare2 },
     { path: '/settings', label: 'Automation Rules', icon: FiSettings },
   ];
+};
+
+export const Sidebar = () => {
+  const { voicemails, activeCalls } = useVoiceStore();
+  const navItems = getNavItems(voicemails, activeCalls);
 
   return (
     <aside className="w-64 border-r border-zinc-800 bg-zinc-950/50 hidden md:flex flex-col h-[calc(100vh-4rem)] sticky top-16">
