@@ -12,6 +12,15 @@ import { FiWifi, FiCloudOff, FiRefreshCw, FiServer } from 'react-icons/fi';
 
 export const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isEdgeModalOpen, setIsEdgeModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsEdgeModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const { voicemails, activeCalls } = useVoiceStore();
   const navItems = getNavItems(voicemails, activeCalls);
   const { connectionStatus, latency } = useVoiceStore();
@@ -50,11 +59,11 @@ export const Header = () => {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-3 mr-4">
             {/* Cloudflare Worker Status */}
-            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg">
+            <button onClick={() => setIsEdgeModalOpen(true)} className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-cyan-500/50 transition-colors cursor-pointer">
               <SafeIcon icon={FiServer} className="text-cyan-400 text-xs" />
               <span className="text-[10px] font-mono text-zinc-300">CF-EDGE</span>
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]"></div>
-            </div>
+            </button>
 
             {/* Latency & Connection Status */}
             <div className={`flex items-center gap-2 px-3 py-1 border rounded-lg transition-colors ${getStatusColor()}`}>
@@ -149,6 +158,71 @@ export const Header = () => {
                   <p className="text-[10px] text-zinc-500 leading-tight italic">Secure Bridge: US-EAST-1 Active</p>
                 </div>
               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isEdgeModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setIsEdgeModalOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden max-w-md w-full"
+              >
+                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+                  <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                    <SafeIcon icon={FiServer} className="text-cyan-400" />
+                    Cloudflare Edge Telemetry
+                  </h3>
+                  <button onClick={() => setIsEdgeModalOpen(false)} className="text-zinc-500 hover:text-zinc-300">
+                    <SafeIcon icon={FiX} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500">Ingress Endpoint</p>
+                    <div className="flex justify-between items-center bg-zinc-900 p-2 rounded border border-zinc-800">
+                      <code className="text-xs text-cyan-400">https://voice.axim.us.com/answer</code>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">HTTP 200 OK</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500">Duplex Stream Path</p>
+                    <div className="flex justify-between items-center bg-zinc-900 p-2 rounded border border-zinc-800">
+                      <code className="text-xs text-indigo-400">wss://voice.axim.us.com/stream</code>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">101 Switching Protocols</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500">Noota Transcription API</p>
+                    <div className="flex justify-between items-center bg-zinc-900 p-2 rounded border border-zinc-800">
+                      <code className="text-xs text-fuchsia-400">https://api.noota.io/v1</code>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Operational</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500">Asguard Firewall KV</p>
+                    <div className="flex justify-between items-center bg-zinc-900 p-2 rounded border border-zinc-800">
+                      <code className="text-xs text-amber-400">ASGUARD_KV Active</code>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Sub-10ms Drop Protocol</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           </>
         )}

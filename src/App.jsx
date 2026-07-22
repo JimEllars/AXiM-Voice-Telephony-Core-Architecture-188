@@ -16,6 +16,7 @@ import { KnowledgeBase } from './pages/KnowledgeBase';
 import { CommunicationHub } from './pages/CommunicationHub';
 import { LiveMonitor } from './pages/LiveMonitor';
 import { NotificationToast } from './components/layout/NotificationToast';
+import { DeskeraSync } from './pages/DeskeraSync';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/security" element={<AsguardFirewall />} />
                 <Route path="/crm-health" element={<CrmSyncHealth />} />
                 <Route path="/crm-sync" element={<NexusSync />} />
+                <Route path="/deskera" element={<DeskeraSync />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
