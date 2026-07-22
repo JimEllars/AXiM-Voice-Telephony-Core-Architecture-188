@@ -7,9 +7,59 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CrmHealthMetrics } from '../components/crm/CrmHealthMetrics';
 import { PipelineVisualizer } from '../components/crm/PipelineVisualizer';
 
+import { createClient } from '@supabase/supabase-js';
+import { useEffect } from 'react';
+
 export const CrmSyncHealth = () => {
   const { crmHealth, crmProvider, fieldMappings, auditLogs, addNotification } = useVoiceStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [metrics, setMetrics] = useState({
+    syncSuccessRate: crmHealth.syncSuccessRate || 100,
+    queueDepth: crmHealth.queueDepth || 0,
+    lastGlobalSync: new Date().toISOString()
+  });
+  const [isPulseActive, setIsPulseActive] = useState(false);
+
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    setIsPulseActive(true);
+
+    const channel = supabase
+      .channel('crm_health_metrics')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'api_usage_logs' }, (payload) => {
+        setMetrics(prev => {
+          // Simple dynamic calculation simulation based on incoming event
+          const newDepth = Math.max(0, prev.queueDepth + (payload.new.status === 'queued' ? 1 : -1));
+          const isSuccess = payload.new.status === 'success';
+          const newRate = isSuccess ? Math.min(100, prev.syncSuccessRate + 1) : Math.max(0, prev.syncSuccessRate - 2);
+
+          return {
+            ...prev,
+            syncSuccessRate: newRate,
+            queueDepth: newDepth,
+            lastGlobalSync: new Date().toISOString()
+          };
+        });
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsPulseActive(true);
+        } else {
+          setIsPulseActive(false);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const combinedHealth = { ...crmHealth, syncSuccessRate: metrics.syncSuccessRate, queueDepth: metrics.queueDepth };
+
 
   const handleGlobalRefresh = () => {
     setIsRefreshing(true);
@@ -46,7 +96,11 @@ export const CrmSyncHealth = () => {
         </button>
       </div>
 
-      <CrmHealthMetrics health={crmHealth} />
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-bold text-zinc-300">Live DB Stream</span>
+        <div className={`w-2.5 h-2.5 rounded-full ${isPulseActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+      </div>
+      <CrmHealthMetrics health={combinedHealth} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-8">
