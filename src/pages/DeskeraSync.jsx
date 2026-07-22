@@ -5,7 +5,7 @@ import { FiDatabase, FiRefreshCw, FiUser, FiBriefcase, FiPhone, FiClock, FiCheck
 import { Badge } from '../components/common/Badge';
 
 export const DeskeraSync = () => {
-  const { syncLogs, crmContacts } = useVoiceStore();
+  const { syncLogs, crmContacts, logEvent, addNotification } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('logs');
   const [search, setSearch] = useState('');
 
@@ -23,7 +23,10 @@ export const DeskeraSync = () => {
           </h1>
           <p className="text-zinc-500 text-sm mt-1">Automated contact matching and activity logging pipeline.</p>
         </div>
-        <button className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2">
+        <button onClick={() => {
+          logEvent('Deskera Global Sync Initiated', 'sync', 'Deskera Gateway');
+          addNotification({ type: 'success', title: 'Sync Initiated', message: 'Deskera Global Sync started successfully.' });
+        }} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2">
           <SafeIcon icon={FiRefreshCw} className="animate-spin-slow" /> Force Global Sync
         </button>
       </div>

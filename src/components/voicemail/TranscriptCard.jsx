@@ -15,6 +15,25 @@ import { ActionTrailModal } from './ActionTrailModal';
 export const TranscriptCard = ({ voicemail }) => {
   const { updateVoicemailClassification } = useVoiceStore();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  React.useEffect(() => {
+    let interval;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => {
+          if (prev + 1 >= voicemail.duration) {
+            setIsPlaying(false);
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } else if (!isPlaying && elapsedSeconds !== 0) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, voicemail.duration]);
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showClassMenu, setShowClassMenu] = useState(false);
@@ -116,9 +135,9 @@ export const TranscriptCard = ({ voicemail }) => {
               <SafeIcon icon={isPlaying ? FiPause : FiPlay} />
             </button>
             <div className="h-1 w-24 bg-zinc-800 rounded-full overflow-hidden hidden sm:block">
-              <div className={`h-full bg-indigo-500 w-1/3 shadow-[0_0_8px_rgba(99,102,241,0.5)] ${isPlaying ? 'animate-[pulse_1s_infinite]' : ''}`}></div>
+              <div className={`h-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all duration-1000`} style={{ width: `${(elapsedSeconds / Math.max(1, voicemail.duration)) * 100}%` }}></div>
             </div>
-            <span className="text-xs text-zinc-500 font-mono">00:{voicemail.duration}</span>
+            <span className="text-xs text-zinc-500 font-mono">00:{elapsedSeconds.toString().padStart(2, '0')} / 00:{voicemail.duration.toString().padStart(2, '0')}</span>
           </div>
           <button 
             onClick={() => setShowResponseModal(true)}

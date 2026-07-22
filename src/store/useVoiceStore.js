@@ -16,6 +16,14 @@ const initialAgents = [
 
 export const useVoiceStore = create((set, get) => ({
   activeCalls: [],
+  crmContacts: [
+    { id: "c1", name: "John Doe", company: "Acme Corp", phone: "+1 555-0101", status: "Active", lastInteraction: "10 mins ago" },
+    { id: "c2", name: "Sarah Smith", company: "Globex", phone: "+1 555-0102", status: "Inactive", lastInteraction: "2 days ago" }
+  ],
+  syncLogs: [
+    { id: "s1", contact: "John Doe", details: "Synced contact details from Onyx", time: "10 mins ago" },
+    { id: "s2", contact: "Sarah Smith", details: "Updated phone number", time: "2 days ago" }
+  ],
   agents: initialAgents,
   nodes: [
     { id: 'node_1', region: 'US-EAST-1', city: 'N. Virginia', health: 98, load: 45, status: 'Online', latency: '12ms', uptime: '99.99%' },

@@ -20,6 +20,7 @@ export const getNavItems = (voicemails, activeCalls) => {
     { path: '/security', label: 'Asguard Firewall', icon: FiShield },
     { path: '/crm-health', label: 'Sync Health', icon: FiActivity },
     { path: '/crm-sync', label: 'Node Config', icon: FiShare2 },
+    { path: '/deskera', label: 'Deskera Pipeline', icon: FiDatabase },
     { path: '/settings', label: 'Automation Rules', icon: FiSettings },
   ];
 };
