@@ -6,7 +6,7 @@ import { FiPhone, FiActivity, FiEye } from 'react-icons/fi';
 import { Badge } from '../common/Badge';
 
 export const LiveCallMonitor = () => {
-  const { activeCalls, setSelectedCall } = useVoiceStore();
+  const { activeCalls, setSelectedCall, seizeCall } = useVoiceStore();
 
   const formatDuration = (seconds) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -69,7 +69,7 @@ export const LiveCallMonitor = () => {
                   <td className="px-5 py-4 font-mono text-zinc-300">
                     {formatDuration(call.duration)}
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-5 py-4 text-right flex justify-end gap-2">
                     <button 
                       onClick={() => setSelectedCall(call)}
                       disabled={call.status === 'ringing'}
@@ -78,6 +78,16 @@ export const LiveCallMonitor = () => {
                       <SafeIcon icon={FiEye} />
                       Observe
                     </button>
+                    {call.status !== 'manual_intervention' && (
+                      <button
+                        onClick={() => seizeCall(call.id)}
+                        disabled={call.status === 'ringing'}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-medium rounded-md border border-indigo-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <SafeIcon icon={FiPhone} />
+                        Seize Call
+                      </button>
+                    )}
                   </td>
                 </motion.tr>
               ))}

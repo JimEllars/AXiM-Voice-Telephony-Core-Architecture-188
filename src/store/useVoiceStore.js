@@ -99,6 +99,36 @@ export const useVoiceStore = create((set, get) => ({
         ] : state.entities
       }));
 
+      if (extraction && (extraction.email || extraction.phone)) {
+        const enrichmentPayload = {
+          request_id: `req_voice_${Date.now()}`,
+          department: analysis.classification === 'Sales' ? 'unifirst_sales' : 'support_c360',
+          caller_app: 'axim-voice-telephony',
+          return_channel: 'sync_response',
+          payload: {
+            first_name: extraction.name !== 'Unknown Contact' ? extraction.name.split(' ')[0] : '',
+            last_name: extraction.name !== 'Unknown Contact' ? extraction.name.split(' ').slice(1).join(' ') : '',
+            company: extraction.company !== 'Independent Entity' ? extraction.company : '',
+            email: extraction.email || '',
+            phone: extraction.phone || voicemail.callerId || '',
+            notes: extraction.notes
+          }
+        };
+
+        // Post to CRM Enrichment Bridge via fetch or Supabase Edge client
+        const bridgeUrl = import.meta.env.VITE_CRM_BRIDGE_URL || 'https://api.axim.us.com/v1/webhooks/enrich';
+        fetch(bridgeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+          },
+          body: JSON.stringify(enrichmentPayload)
+        }).catch(err => console.error('[CRM_BRIDGE] Failed to dispatch voicemail entity:', err));
+
+        set(state => ({ auditLogs: [{ id: Date.now(), event: `[CRM_BRIDGE] Extracted entity [${extraction.name}] dispatched for firmographic enrichment.`, type: 'system', source: 'CRM Enrichment', time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50) }));
+      }
+
       // Trigger Rules
       get().executeRules(newVm);
     } catch (error) {
@@ -177,9 +207,31 @@ export const useVoiceStore = create((set, get) => ({
     }));
     get().logEvent('Agent load rebalanced', 'system', 'Load Balancer');
   },
-  seizeCall: (id) => {
-    set(state => ({ activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c) }));
-    get().logEvent('Call Override Initiated by Operator', 'security', 'Voice Cockpit');
+  seizeCall: async (id, operatorId = 'COMMANDER_RIKER') => {
+    set(state => ({
+      activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c)
+    }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('hitl_audit_logs').insert([{
+          action_type: 'CALL_TAKEOVER_OVERRIDE',
+          component_origin: 'AXiM Voice Telephony Core',
+          target_id: id,
+          resolved_by: operatorId,
+          status: 'INTERVENED',
+          timestamp: new Date().toISOString()
+        }]);
+      }
+    } catch (e) {
+      console.error('[HITL_LOG] Failed to log call takeover:', e);
+    }
+
+    get().logEvent(`Call Takeover Override executed by operator [${operatorId}] on call [${id}]`, 'security', 'Voice Cockpit');
   },
 
   // --- SIMULATION ---
