@@ -17,18 +17,54 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
   const isManual = call.status === 'manual_intervention';
 
   useEffect(() => {
-    if (isManual) return;
-    const timer = setInterval(() => {
-      const isCaller = Math.random() > 0.5;
-      const newMsg = {
-        id: Date.now(),
-        sender: isCaller ? 'caller' : 'onyx',
-        text: isCaller ? 'Yes, I was wondering about the status of my recent invoice for the uniform delivery.' : 'I can certainly help with that. Let me look up your account based on your caller ID.'
-      };
-      setMessages(prev => [...prev, newMsg]);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [isManual]);
+    if (!call?.id) return;
+    const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      if (isManual) return;
+      const timer = setInterval(() => {
+        const isCaller = Math.random() > 0.5;
+        const newMsg = {
+          id: Date.now(),
+          sender: isCaller ? 'caller' : 'onyx',
+          text: isCaller ? 'Yes, I was wondering about the status of my recent invoice for the uniform delivery.' : 'I can certainly help with that. Let me look up your account based on your caller ID.'
+        };
+        setMessages(prev => [...prev, newMsg]);
+      }, 4000);
+      return () => clearInterval(timer);
+    }
+
+    let channel;
+    let client;
+    let isMounted = true;
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      if (!isMounted) return;
+      client = createClient(supabaseUrl, supabaseKey);
+      channel = client.channel(`transcript-${call.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'call_transcripts',
+          filter: `call_id=eq.${call.id}`
+        }, (payload) => {
+          if (payload.new && payload.new.text) {
+            setMessages(prev => [...prev, {
+              id: payload.new.id || Date.now(),
+              sender: payload.new.sender || 'onyx',
+              text: payload.new.text
+            }]);
+          }
+        })
+        .subscribe();
+    });
+
+    return () => {
+      isMounted = false;
+      if (client && channel) {
+        client.removeChannel(channel);
+      }
+    };
+  }, [call?.id, isManual]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

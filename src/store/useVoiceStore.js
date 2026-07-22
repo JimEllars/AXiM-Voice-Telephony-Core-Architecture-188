@@ -249,16 +249,22 @@ export const useVoiceStore = create((set, get) => ({
        }, 500);
     }
 
-    const connect = () => {
+    const connect = async () => {
       try {
+        const previousStatus = get().connectionStatus;
         set({ connectionStatus: 'reconnecting' });
-
-        // Mock connection delay
-        setTimeout(() => {
+        const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+        const res = await fetch(`${workerUrl}/v1/health`, { method: 'GET' });
+        if (res.ok) {
+          if (previousStatus === 'offline' || previousStatus === 'reconnecting') {
+            get().logEvent('Telemetry stream recovered from offline state.', 'system', 'Edge Node Check');
+          }
           set({ connectionStatus: 'connected' });
           reconnectAttempts = 0;
           get().addNotification({ type: 'success', title: 'Mesh Connected', message: 'Realtime telemetry active' });
-        }, 1000);
+        } else {
+          set({ connectionStatus: 'degraded' });
+        }
       } catch (error) {
         set({ connectionStatus: 'offline' });
         get().addNotification({ type: 'error', title: 'Connection Failed', message: error.message });
