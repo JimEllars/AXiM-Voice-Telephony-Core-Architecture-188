@@ -167,12 +167,27 @@ export const useVoiceStore = create((set, get) => ({
       agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available' } : a),
       agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId)
     }));
+    get().logEvent('Agent load rebalanced', 'system', 'Load Balancer');
+  },
+  seizeCall: (id) => {
+    set(state => ({ activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c) }));
+    get().logEvent('Call Override Initiated by Operator', 'security', 'Voice Cockpit');
   },
 
   // --- SIMULATION ---
   subscribeToTelephonyNetwork: () => {
     let reconnectAttempts = 0;
     const maxBackoff = 30000;
+
+    const envSupabase = import.meta.env.VITE_SUPABASE_URL;
+    const envWorker = import.meta.env.VITE_WORKER_INGRESS_URL;
+
+    if (!envSupabase || !envWorker) {
+       setTimeout(() => {
+          set({ connectionStatus: 'connected' });
+          get().addNotification({ type: 'info', title: 'Demo Mode', message: 'Running in Edge Simulation Mode' });
+       }, 500);
+    }
 
     const connect = () => {
       try {
@@ -262,7 +277,8 @@ export const useVoiceStore = create((set, get) => ({
   deleteVoicemail: (id) => set(state => ({ voicemails: state.voicemails.filter(v => v.id !== id) })),
   updateVoicemailPriority: (id, priority) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, priority } : v) })),
   updateVoicemailClassification: (id, classification) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
+  updateMapping: (id, target) => set(state => ({ fieldMappings: state.fieldMappings.map(m => m.id === id ? { ...m, target } : m) })),
   bulkUpdateClassification: (ids, classification) => set(state => ({ voicemails: state.voicemails.map(v => ids.includes(v.id) ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
   setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
-  seizeCall: (id) => set(state => ({ activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c) })),
+
 }));

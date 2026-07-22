@@ -99,8 +99,16 @@ export const NexusSync = () => {
                       <div className="text-[10px] uppercase font-bold text-zinc-500 mb-1.5 tracking-widest">{crmProvider} Target</div>
                       <input 
                         className="w-full bg-zinc-900 px-4 py-2 rounded-lg border border-zinc-800 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/50"
-                        value={map.target}
-                        onChange={(e) => updateMapping(map.id, e.target.value)}
+                        defaultValue={map.target}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (!val) {
+                            addNotification({ type: 'error', title: 'Invalid Mapping', message: 'Target schema field cannot be empty.' });
+                          } else {
+                            if (updateMapping) updateMapping(map.id, val);
+                            addNotification({ type: 'success', title: 'Mapping Updated', message: 'Schema synchronization confirmed.' });
+                          }
+                        }}
                       />
                     </div>
                     <button className="p-2 text-zinc-600 hover:text-indigo-400 transition-colors">
