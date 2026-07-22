@@ -8,6 +8,7 @@ export const DeskeraSync = () => {
   const { syncLogs, crmContacts, logEvent, addNotification } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('logs');
   const [search, setSearch] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const filteredContacts = crmContacts.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -23,11 +24,32 @@ export const DeskeraSync = () => {
           </h1>
           <p className="text-zinc-500 text-sm mt-1">Automated contact matching and activity logging pipeline.</p>
         </div>
-        <button onClick={() => {
-          logEvent('Deskera Global Sync Initiated', 'sync', 'Deskera Gateway');
-          addNotification({ type: 'success', title: 'Sync Initiated', message: 'Deskera Global Sync started successfully.' });
-        }} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2">
-          <SafeIcon icon={FiRefreshCw} className="animate-spin-slow" /> Force Global Sync
+        <button disabled={isSyncing} onClick={async () => {
+          setIsSyncing(true);
+          try {
+            const bridgeUrl = import.meta.env.VITE_CRM_BRIDGE_URL || 'https://api.axim.us.com/v1/management/sync';
+            const res = await fetch(bridgeUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`
+              },
+              body: JSON.stringify({ target_system: 'Deskera', mode: 'reconciliation' })
+            });
+
+            if (res.ok) {
+              addNotification({ type: 'success', title: 'Deskera Sync Triggered', message: 'Manual reconciliation queued via CRM Bridge.' });
+              logEvent('Manual Deskera reconciliation initiated via CRM Enrichment Bridge', 'sync', 'Deskera Pipeline');
+            } else {
+              throw new Error(`Sync response error: ${res.status}`);
+            }
+          } catch (err) {
+            addNotification({ type: 'error', title: 'Sync Failed', message: err.message });
+          } finally {
+            setIsSyncing(false);
+          }
+        }} className={`px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2 ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <SafeIcon icon={FiRefreshCw} className={isSyncing ? 'animate-spin' : 'animate-spin-slow'} /> {isSyncing ? 'Syncing...' : 'Force Global Sync'}
         </button>
       </div>
 
