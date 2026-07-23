@@ -82,6 +82,13 @@ export const KnowledgeBase = () => {
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="cyber" className="text-[8px] px-1">{doc.type}</Badge>
                           <span className="text-[10px] text-zinc-600 font-mono">{doc.size}</span>
+                          <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
+                            doc.embeddingStatus === 'VECTORIZED'
+                              ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-400'
+                              : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                          }`}>
+                            {doc.embeddingStatus === 'VECTORIZED' ? 'VECTORIZED (@CF/BGE-LARGE)' : 'LOCAL_ONLY'}
+                          </span>
                         </div>
                       </div>
                     </div>
