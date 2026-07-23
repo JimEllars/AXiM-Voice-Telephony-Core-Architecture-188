@@ -61,13 +61,20 @@ export const CrmSyncHealth = () => {
   const combinedHealth = { ...crmHealth, syncSuccessRate: metrics.syncSuccessRate, queueDepth: metrics.queueDepth };
 
 
-  const handleGlobalRefresh = () => {
+    const handleGlobalRefresh = async () => {
     setIsRefreshing(true);
-    addNotification({ title: 'Mesh Synchronizing', message: 'Re-validating all neural field mappings...', type: 'info' });
-    setTimeout(() => {
+    try {
+      const bridgeUrl = import.meta.env.VITE_CRM_BRIDGE_URL || 'https://api.axim.us.com/v1/management/sync';
+      await fetch(bridgeUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}` }
+      });
+      addNotification({ title: 'Sync Complete', message: 'All CRM bridges re-validated.', type: 'success' });
+    } catch (err) {
+      addNotification({ title: 'Sync Error', message: 'Bridge validation failed.', type: 'error' });
+    } finally {
       setIsRefreshing(false);
-      addNotification({ title: 'Sync Complete', message: 'All CRM bridges are operating at peak efficiency.', type: 'success' });
-    }, 2000);
+    }
   };
 
   const providers = [

@@ -24,6 +24,8 @@ export const LiveCallMonitor = () => {
         <Badge variant="cyber">{activeCalls.length} Active Lines</Badge>
       </div>
 
+
+      <audio id="live-call-audio" autoPlay playsInline style={{ display: 'none' }} />
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-zinc-900/80 text-zinc-400 uppercase text-[10px] tracking-wider font-mono">
