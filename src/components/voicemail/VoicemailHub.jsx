@@ -2,12 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { useVoiceStore } from '../../store/useVoiceStore';
 import { TranscriptCard } from './TranscriptCard';
 import SafeIcon from '../../common/SafeIcon';
-import { FiInbox, FiSearch, FiX, FiFilter } from 'react-icons/fi';
+import { FiInbox, FiSearch, FiX, FiFilter, FiRefreshCw } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const VoicemailHub = () => {
-  const { voicemails } = useVoiceStore();
+  const { voicemails, fetchVoicemails } = useVoiceStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchVoicemails();
+    setIsRefreshing(false);
+  };
 
   const filteredVoicemails = useMemo(() => {
     return voicemails.filter(vm => 
@@ -28,6 +35,14 @@ export const VoicemailHub = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-400 hover:text-cyan-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+            title="Refresh Inbox"
+          >
+            <SafeIcon icon={FiRefreshCw} className={isRefreshing ? 'animate-spin' : ''} />
+          </button>
           <div className="relative group">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-zinc-500 group-focus-within:text-cyan-400 transition-colors">
               <SafeIcon icon={FiSearch} />

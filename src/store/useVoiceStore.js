@@ -216,6 +216,12 @@ export const useVoiceStore = create((set, get) => ({
           status: 'completed'
         });
 
+        get().addNotification({
+          type: 'success',
+          title: 'Automation Triggered',
+          message: `Rule "${rule.name}" fired. Dispatched ${template ? template.name : 'sequence'}.`
+        });
+
         get().logEvent(actionDetail, 'sync', 'Automation Engine');
       }
     });
@@ -300,18 +306,17 @@ export const useVoiceStore = create((set, get) => ({
     try {
       const audioElement = document.getElementById('live-call-audio');
       if (audioElement) {
-        // Create an empty audio stream and attach to the element
+        // Create a silent audio context oscillator to simulate an active track if physical mic fails
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = ctx.createOscillator();
-        const destination = ctx.createMediaStreamDestination();
-        oscillator.connect(destination);
+        const dest = ctx.createMediaStreamDestination();
+        oscillator.connect(dest);
         oscillator.start();
-
-        audioElement.srcObject = destination.stream;
+        audioElement.srcObject = dest.stream;
         console.log('[WEBRTC] Intercepted seizeCall, audio stream attached');
       }
-    } catch(err) {
-      console.error('[WEBRTC] Failed to attach audio stream', err);
+    } catch (err) {
+      console.warn('[WEBRTC] Failed to bind local stream to DOM element', err);
     }
 
 
@@ -484,6 +489,16 @@ export const useVoiceStore = create((set, get) => ({
   },
 
   // --- HELPERS ---
+  fetchVoicemails: async () => {
+    // Simulate fetching / resetting voicemail queue
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Force a re-render or reset of mock voicemails
+        set(state => ({ voicemails: [...state.voicemails] }));
+        resolve();
+      }, 1000);
+    });
+  },
   addNotification: (n) => set(state => ({ notifications: [{ id: Date.now(), ...n, time: new Date() }, ...state.notifications].slice(0, 5) })),
   removeNotification: (id) => set(state => ({ notifications: state.notifications.filter(n => n.id !== id) })),
   logEvent: (event, type = 'info', source = 'System') => set(state => ({ auditLogs: [{ id: Date.now(), event, type, source, time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50) })),
