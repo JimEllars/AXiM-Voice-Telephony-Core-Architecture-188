@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { analyzeTranscript } from '../services/triageEngine';
-import { extractEntityData } from '../services/extractionEngine';
+import { extractEntityData, getWorkersAiSchemaPayload } from '../services/extractionEngine';
 
 const initialDepartments = [
   { id: 'dept_1', name: 'Sales', color: 'text-emerald-400', icon: 'TrendingUp', description: 'Enterprise acquisition.' },
@@ -92,10 +92,32 @@ export const useVoiceStore = create((set, get) => ({
     }
   },
 
-  processInboundVoicemail: (voicemail) => {
+  processInboundVoicemail: async (voicemail) => {
     try {
       const analysis = analyzeTranscript(voicemail.transcript);
-      const extraction = extractEntityData(voicemail.transcript);
+      let extraction = extractEntityData(voicemail.transcript);
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+
+      try {
+        const schemaPayload = getWorkersAiSchemaPayload(voicemail.transcript);
+        const res = await fetch(`${workerUrl}/v1/ai/extract`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+          },
+          body: JSON.stringify(schemaPayload)
+        });
+
+        if (res.ok) {
+          const aiData = await res.json();
+          if (aiData && aiData.name) {
+            extraction = { ...extraction, ...aiData };
+          }
+        }
+      } catch (e) {
+        console.warn('[WORKERS_AI] Edge JSON extraction failed, using regex fallback:', e);
+      }
       const id = `vm_${Date.now()}`;
       const time = new Date().toISOString();
 
@@ -205,9 +227,29 @@ export const useVoiceStore = create((set, get) => ({
   })),
 
   // --- KNOWLEDGE BASE ---
-  addContextDoc: (doc) => set(state => ({
-    contextDocuments: [{ ...doc, id: `doc_${Date.now()}` }, ...state.contextDocuments]
-  })),
+  addContextDoc: async (doc) => {
+    const newDoc = { ...doc, id: `doc_${Date.now()}`, embeddingStatus: 'PENDING' };
+    set(state => ({ contextDocuments: [newDoc, ...state.contextDocuments] }));
+
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      const res = await fetch(`${workerUrl}/v1/ai/embeddings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: '@cf/baai/bge-large-en-v1.5', text: doc.content })
+      });
+
+      if (res.ok) {
+        set(state => ({
+          contextDocuments: state.contextDocuments.map(d =>
+            d.id === newDoc.id ? { ...d, embeddingStatus: 'VECTORIZED' } : d
+          )
+        }));
+      }
+    } catch (e) {
+      console.warn('[WORKERS_AI] Embedding generation failed:', e);
+    }
+  },
 
   deleteContextDoc: (id) => set(state => ({
     contextDocuments: state.contextDocuments.filter(d => d.id !== id)
