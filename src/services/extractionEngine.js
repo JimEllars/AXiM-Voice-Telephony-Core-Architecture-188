@@ -32,3 +32,23 @@ export const extractEntityData = (transcript) => {
     notes
   };
 };
+export const getWorkersAiSchemaPayload = (transcript) => ({
+  messages: [
+    { role: 'system', content: 'You are an expert entity extraction agent for AXiM Voice Telephony.' },
+    { role: 'user', content: `Extract contact name, company, email, phone, and intent summary from this transcript: "${transcript}"` }
+  ],
+  response_format: {
+    type: 'json_schema',
+    json_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        company: { type: 'string' },
+        email: { type: 'string' },
+        phone: { type: 'string' },
+        notes: { type: 'string' }
+      },
+      required: ['name', 'company', 'notes']
+    }
+  }
+});

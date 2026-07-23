@@ -93,6 +93,10 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
                 <Badge variant={isManual ? 'success' : 'cyber'} className="animate-pulse">
                   {isManual ? 'Manual Override' : 'Live Observation'}
                 </Badge>
+                <div className="text-[10px] text-indigo-400 font-mono flex items-center gap-1.5 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                  STT: @CF/OPENAI/WHISPER
+                </div>
               </div>
               <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
                 <SafeIcon icon={FiGlobe} className="text-[9px]" /> Node: {call.node} • Latency: 12ms

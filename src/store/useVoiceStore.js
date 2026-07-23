@@ -233,12 +233,14 @@ export const useVoiceStore = create((set, get) => ({
     }));
   },
 
+  clearNodeAlert: (id) => set(state => ({ nodeAlerts: state.nodeAlerts.filter(a => a.id !== id) })),
   clearAgentAlert: (id) => set(state => ({ agentAlerts: state.agentAlerts.filter(a => a.id !== id) })),
 
   rebalanceAgent: (agentId) => {
     set(state => ({
       agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available' } : a),
-      agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId)
+      agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId),
+      nodeAlerts: state.nodeAlerts.filter(a => a.nodeId !== agentId)
     }));
     get().logEvent('Agent load rebalanced', 'system', 'Load Balancer');
   },
@@ -346,7 +348,36 @@ export const useVoiceStore = create((set, get) => ({
         const currentLatency = get().latency;
         const newLatency = Math.max(10, Math.min(800, currentLatency + (Math.floor(Math.random() * 40) - 20)));
 
-        set({ agents: updatedAgents, latency: newLatency });
+        const updatedNodes = get().nodes.map(node => {
+          // Simulate latency per node, fluctuating around some base value
+          // Instead of purely random, let's just make one occasionally spike
+          const isSpike = Math.random() > 0.95;
+          const currentLatency = parseInt(node.latency.replace('ms', ''));
+          const nodeNewLatency = isSpike ? currentLatency + 250 + Math.floor(Math.random() * 100) : Math.max(10, Math.min(800, currentLatency + (Math.floor(Math.random() * 40) - 20)));
+
+          if (nodeNewLatency > 300) {
+            get().dispatchTelemetryError('NODE_LATENCY_SPIKE', `Node ${node.id} latency reached ${nodeNewLatency}ms`);
+
+            // Add a node alert if not already present
+            const existingAlert = get().nodeAlerts.find(a => a.id === `alert_${node.id}`);
+            if (!existingAlert) {
+              set(state => ({
+                nodeAlerts: [...state.nodeAlerts, {
+                  id: `alert_${node.id}`,
+                  region: node.region,
+                  nodeId: node.id,
+                  type: 'Critical Latency',
+                  severity: 'amber',
+                  value: `${nodeNewLatency}ms`
+                }]
+              }));
+            }
+          }
+
+          return { ...node, latency: `${nodeNewLatency}ms` };
+        });
+
+        set({ agents: updatedAgents, latency: newLatency, nodes: updatedNodes });
 
         // Simulate random disconnects for fault tolerance testing
         if (Math.random() > 0.98) {

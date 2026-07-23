@@ -5,7 +5,7 @@ import SafeIcon from '../../common/SafeIcon';
 import { FiAlertTriangle, FiX, FiActivity, FiZap } from 'react-icons/fi';
 
 export const NodeAlertBanner = () => {
-  const { nodeAlerts, clearNodeAlert } = useVoiceStore();
+  const { nodeAlerts, clearNodeAlert, rebalanceAgent } = useVoiceStore();
 
   if (nodeAlerts.length === 0) return null;
 
@@ -42,6 +42,14 @@ export const NodeAlertBanner = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              {alert.severity === 'amber' && (
+                <button
+                  onClick={() => rebalanceAgent(alert.nodeId)}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold rounded-lg transition-all"
+                >
+                  Rebalance
+                </button>
+              )}
               <button 
                 onClick={() => clearNodeAlert(alert.id)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-all"
