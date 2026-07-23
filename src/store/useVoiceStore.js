@@ -58,6 +58,40 @@ export const useVoiceStore = create((set, get) => ({
   messages: [],
 
   // --- CORE ACTIONS ---
+
+  dispatchTelemetryError: async (eventType, errorMessage) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) return;
+
+      const payload = {
+        telemetry_envelope: {
+          project_id: "AXIM_VOICE_TELEPHONY",
+          environment: import.meta.env.MODE || "production",
+          timestamp: new Date().toISOString()
+        },
+        event_payload: {
+          event_type: eventType,
+          severity: "HIGH",
+          component_origin: "useVoiceStore.js",
+          error_message: errorMessage
+        }
+      };
+
+      fetch(`${supabaseUrl}/functions/v1/telemetry-ingress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error('[TELEMETRY] Dispatch failed:', err));
+    } catch (e) {
+      console.error('[TELEMETRY] Internal dispatch error:', e);
+    }
+  },
+
   processInboundVoicemail: (voicemail) => {
     try {
       const analysis = analyzeTranscript(voicemail.transcript);
@@ -133,6 +167,7 @@ export const useVoiceStore = create((set, get) => ({
       get().executeRules(newVm);
     } catch (error) {
       get().addNotification({ type: 'error', title: 'Processing Error', message: error.message || 'Failed to process inbound transmission' });
+      get().dispatchTelemetryError('VOICEMAIL_PROCESSING_ERROR', error.message || 'Failed to process inbound transmission');
     }
   },
 
@@ -249,29 +284,51 @@ export const useVoiceStore = create((set, get) => ({
        }, 500);
     }
 
+    const checkEdgeHealth = async () => {
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      try {
+        const start = Date.now();
+        const res = await fetch(`${workerUrl}/v1/health`, { method: 'GET' });
+        const roundTripMs = Date.now() - start;
+
+        if (res.ok) {
+          set({
+            connectionStatus: 'connected',
+            latency: roundTripMs
+          });
+        } else {
+          set({ connectionStatus: 'degraded' });
+        }
+      } catch (err) {
+        set({ connectionStatus: 'offline' });
+        get().dispatchTelemetryError('EDGE_HEALTH_CHECK_FAILED', err.message);
+      }
+    };
+
     const connect = async () => {
       try {
         const previousStatus = get().connectionStatus;
         set({ connectionStatus: 'reconnecting' });
-        const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
-        const res = await fetch(`${workerUrl}/v1/health`, { method: 'GET' });
-        if (res.ok) {
+
+        await checkEdgeHealth();
+
+        const currentStatus = get().connectionStatus;
+        if (currentStatus === 'connected') {
           if (previousStatus === 'offline' || previousStatus === 'reconnecting') {
             get().logEvent('Telemetry stream recovered from offline state.', 'system', 'Edge Node Check');
           }
-          set({ connectionStatus: 'connected' });
           reconnectAttempts = 0;
           get().addNotification({ type: 'success', title: 'Mesh Connected', message: 'Realtime telemetry active' });
-        } else {
-          set({ connectionStatus: 'degraded' });
         }
       } catch (error) {
         set({ connectionStatus: 'offline' });
         get().addNotification({ type: 'error', title: 'Connection Failed', message: error.message });
+        get().dispatchTelemetryError('NETWORK_DISCONNECT', error.message);
       }
     };
 
     connect();
+    const healthInterval = setInterval(checkEdgeHealth, 10000);
 
     const interval = setInterval(() => {
       const { activeCalls, agents, connectionStatus } = get();
@@ -295,6 +352,7 @@ export const useVoiceStore = create((set, get) => ({
         if (Math.random() > 0.98) {
           set({ connectionStatus: 'offline' });
           get().addNotification({ type: 'error', title: 'Connection Lost', message: 'Attempting to reconnect...' });
+          get().dispatchTelemetryError('NETWORK_DISCONNECT', 'Simulated connection lost');
 
           reconnectAttempts++;
           const backoff = Math.min(1000 * Math.pow(2, reconnectAttempts), maxBackoff);
@@ -325,7 +383,7 @@ export const useVoiceStore = create((set, get) => ({
         get().addNotification({ type: 'error', title: 'Telemetry Error', message: 'Failed to sync telemetry data' });
       }
     }, 4000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); clearInterval(healthInterval); };
   },
 
   // --- HELPERS ---
