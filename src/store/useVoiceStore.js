@@ -104,7 +104,8 @@ export const useVoiceStore = create((set, get) => ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+            'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+            'X-AXiM-Gateway-Trace': `req_${Date.now()}_voice_telephony`
           },
           body: JSON.stringify(schemaPayload)
         });
@@ -235,7 +236,11 @@ export const useVoiceStore = create((set, get) => ({
       const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
       const res = await fetch(`${workerUrl}/v1/ai/embeddings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'X-AXiM-Gateway-Trace': `req_${Date.now()}_voice_telephony`
+        },
         body: JSON.stringify({ model: '@cf/baai/bge-large-en-v1.5', text: doc.content })
       });
 
@@ -290,6 +295,25 @@ export const useVoiceStore = create((set, get) => ({
     set(state => ({
       activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c)
     }));
+
+    // WebRTC Audio Integration (Cloudflare Calls / Simulation)
+    try {
+      const audioElement = document.getElementById('live-call-audio');
+      if (audioElement) {
+        // Create an empty audio stream and attach to the element
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const destination = ctx.createMediaStreamDestination();
+        oscillator.connect(destination);
+        oscillator.start();
+
+        audioElement.srcObject = destination.stream;
+        console.log('[WEBRTC] Intercepted seizeCall, audio stream attached');
+      }
+    } catch(err) {
+      console.error('[WEBRTC] Failed to attach audio stream', err);
+    }
+
 
     try {
       const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
