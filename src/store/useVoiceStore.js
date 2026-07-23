@@ -15,6 +15,13 @@ const initialAgents = [
 ];
 
 export const useVoiceStore = create((set, get) => ({
+  threats: [
+    { id: 't1', callerId: '+1 (415) 555-0192', type: 'Robocall', score: 98, region: 'US-WEST', reputation: 'Critical', ip: '192.168.1.1' },
+    { id: 't2', callerId: '+44 20 7946 0958', type: 'Spam', score: 85, region: 'EU-WEST', reputation: 'High', ip: '10.0.0.1' },
+  ],
+  firewallRules: [
+    { id: 'fr_1', name: 'Global Spam Block', enabled: true, type: 'Heuristic', target: 'Global', action: 'Drop' }
+  ],
   activeCalls: [],
   crmContacts: [
     { id: "c1", name: "John Doe", company: "Acme Corp", phone: "+1 555-0101", status: "Active", lastInteraction: "10 mins ago" },
@@ -58,6 +65,27 @@ export const useVoiceStore = create((set, get) => ({
   messages: [],
 
   // --- CORE ACTIONS ---
+  syncBlacklistToEdge: async (ipAddress, reason) => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      const res = await fetch(`${workerUrl}/v1/security/blacklist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+        },
+        body: JSON.stringify({ ip: ipAddress, reason, action: 'BLOCK' })
+      });
+
+      if (res.ok) {
+        get().addNotification({ type: 'success', title: 'Edge WAF Updated', message: `IP ${ipAddress} synchronized to Cloudflare ASGUARD_BLACKLIST KV.` });
+      } else {
+        get().addNotification({ type: 'error', title: 'Edge WAF Sync Failed', message: `Failed to block ${ipAddress}` });
+      }
+    } catch (err) {
+      console.error('[ASGUARD] Failed to sync blacklist to edge:', err);
+    }
+  },
 
   dispatchTelemetryError: async (eventType, errorMessage) => {
     try {
@@ -489,6 +517,11 @@ export const useVoiceStore = create((set, get) => ({
   },
 
   // --- HELPERS ---
+  addFirewallRule: (rule) => set(state => ({ firewallRules: [{ ...rule, id: `fr_${Date.now()}`, enabled: true }, ...state.firewallRules] })),
+  addThreat: (threat) => set(state => ({ threats: [threat, ...state.threats].slice(0, 50) })),
+  whitelistNumber: (number) => set(state => ({ threats: state.threats.filter(t => t.callerId !== number) })),
+  toggleFirewallRule: (id) => set(state => ({ firewallRules: state.firewallRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
+  deleteFirewallRule: (id) => set(state => ({ firewallRules: state.firewallRules.filter(r => r.id !== id) })),
   fetchVoicemails: async () => {
     // Simulate fetching / resetting voicemail queue
     return new Promise((resolve) => {
