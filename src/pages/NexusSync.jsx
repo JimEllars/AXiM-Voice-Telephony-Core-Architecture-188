@@ -6,11 +6,12 @@ import { Badge } from '../components/common/Badge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const NexusSync = () => {
-  const { crmProvider, setCrmProvider, fieldMappings, updateMapping, auditLogs, addNotification } = useVoiceStore();
+  const { crmProvider, setCrmProvider, fieldMappings, updateMapping, auditLogs, addNotification, triggerCrmReconciliation } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('ledger');
 
-  const handleSync = () => {
+  const handleSync = async () => {
     addNotification({ title: 'Global Sync Initiated', message: `Bridging mesh data with ${crmProvider} production environment.`, type: 'info' });
+    await triggerCrmReconciliation('global', crmProvider);
   };
 
   const connectorGallery = [

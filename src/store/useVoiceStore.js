@@ -479,6 +479,7 @@ export const useVoiceStore = create((set, get) => ({
         if (currentStatus === 'connected') {
           if (previousStatus === 'offline' || previousStatus === 'reconnecting') {
             get().logEvent('Telemetry stream recovered from offline state.', 'system', 'Edge Node Check');
+            get().dispatchTelemetryError('TELEPHONY_RECONNECT_SUCCESS', 'Realtime telephony network channel re-established.');
           }
           reconnectAttempts = 0;
           get().addNotification({ type: 'success', title: 'Mesh Connected', message: 'Realtime telemetry active' });
@@ -651,7 +652,69 @@ export const useVoiceStore = create((set, get) => ({
     get().logEvent(`Manual triage override: Voicemail [${id}] reclassified as [${classification}]`, 'sync', 'Triage HUD');
   },
   updateMapping: (id, target) => set(state => ({ fieldMappings: state.fieldMappings.map(m => m.id === id ? { ...m, target } : m) })),
-  bulkUpdateClassification: (ids, classification) => set(state => ({ voicemails: state.voicemails.map(v => ids.includes(v.id) ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
+  triggerCrmReconciliation: async (contactId, provider = 'Deskera') => {
+    const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+    const bridgeUrl = import.meta.env.VITE_CRM_BRIDGE_URL || `${workerUrl}/v1/webhooks/enrich`;
+    const contact = get().crmContacts.find(c => c.id === contactId);
+
+    try {
+      const res = await fetch(bridgeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'X-AXiM-Gateway-Trace': `req_${Date.now()}_voice_telephony`
+        },
+        body: JSON.stringify({
+          request_id: `rec_${Date.now()}`,
+          department: 'crm_reconciliation',
+          caller_app: 'axim-voice-telephony',
+          payload: contact || { contact_id: contactId, provider }
+        })
+      });
+
+      if (res.ok) {
+        const newLog = {
+          id: `s_${Date.now()}`,
+          contact: contact ? contact.name : contactId,
+          details: `Manual ${provider} synchronization completed successfully via CRM Bridge.`,
+          time: 'Just Now'
+        };
+        set(state => ({ syncLogs: [newLog, ...state.syncLogs].slice(0, 50) }));
+        get().addNotification({ type: 'success', title: 'CRM Sync Complete', message: `${provider} record re-reconciled.` });
+      }
+    } catch (e) {
+      console.error('[CRM_SYNC] Reconciliation request failed:', e);
+      get().addNotification({ type: 'error', title: 'CRM Sync Error', message: e.message });
+    }
+  },
+  bulkUpdateClassification: async (ids, classification) => {
+    set(state => ({
+      voicemails: state.voicemails.map(v =>
+        ids.includes(v.id) ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v
+      )
+    }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey && ids.length > 0) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('support_tickets')
+          .update({
+            category: classification,
+            updated_at: new Date().toISOString()
+          })
+          .in('external_reference_id', ids);
+      }
+    } catch (e) {
+      console.error('[TRIAGE_SYNC] Bulk classification persistence failed:', e);
+      get().dispatchTelemetryError('BULK_TRIAGE_SYNC_ERROR', e.message);
+    }
+
+    get().logEvent(`Bulk triage override: [${ids.length}] voicemails reclassified as [${classification}]`, 'sync', 'Triage HUD');
+  },
   setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
 
 }));
