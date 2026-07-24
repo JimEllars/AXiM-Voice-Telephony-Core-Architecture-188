@@ -5,7 +5,7 @@ import { FiDatabase, FiRefreshCw, FiUser, FiBriefcase, FiPhone, FiClock, FiCheck
 import { Badge } from '../components/common/Badge';
 
 export const DeskeraSync = () => {
-  const { syncLogs, crmContacts, logEvent, addNotification } = useVoiceStore();
+  const { syncLogs, crmContacts, logEvent, addNotification, triggerCrmReconciliation } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('logs');
   const [search, setSearch] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -27,24 +27,7 @@ export const DeskeraSync = () => {
         <button disabled={isSyncing} onClick={async () => {
           setIsSyncing(true);
           try {
-            const bridgeUrl = import.meta.env.VITE_CRM_BRIDGE_URL || 'https://api.axim.us.com/v1/management/sync';
-            const res = await fetch(bridgeUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`
-              },
-              body: JSON.stringify({ target_system: 'Deskera', mode: 'reconciliation' })
-            });
-
-            if (res.ok) {
-              addNotification({ type: 'success', title: 'Deskera Sync Triggered', message: 'Manual reconciliation queued via CRM Bridge.' });
-              logEvent('Manual Deskera reconciliation initiated via CRM Enrichment Bridge', 'sync', 'Deskera Pipeline');
-            } else {
-              throw new Error(`Sync response error: ${res.status}`);
-            }
-          } catch (err) {
-            addNotification({ type: 'error', title: 'Sync Failed', message: err.message });
+            await triggerCrmReconciliation('global', 'Deskera');
           } finally {
             setIsSyncing(false);
           }
@@ -158,7 +141,7 @@ export const DeskeraSync = () => {
                     </div>
                     <div className="mt-4 pt-3 border-t border-zinc-800 flex justify-between items-center">
                       <span className="text-[10px] text-zinc-500 font-mono">Last seen: {contact.lastInteraction}</span>
-                      <button className="text-[10px] text-cyan-400 uppercase font-bold tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">CRM Profile</button>
+                      <button onClick={() => triggerCrmReconciliation(contact.id, 'Deskera')} className="text-[10px] text-cyan-400 uppercase font-bold tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Sync Contact</button>
                     </div>
                   </div>
                 ))}
