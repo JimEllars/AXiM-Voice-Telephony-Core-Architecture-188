@@ -9,7 +9,7 @@ import { ThreatRadar } from '../components/security/ThreatRadar';
 import { ThreatDetailsModal } from '../components/security/ThreatDetailsModal';
 
 export const AsguardFirewall = () => {
-  const { threats, threatMetrics, firewallRules, addFirewallRule, whitelistNumber, addThreat } = useVoiceStore();
+  const { threats, threatMetrics, firewallRules, addFirewallRule, whitelistNumber, addThreat, syncBlacklistToEdge } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('radar');
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,9 +49,17 @@ export const AsguardFirewall = () => {
     }).catch(err => console.error('[ASGUARD] Failed to load Supabase client:', err));
   }, [addThreat]);
 
-  const handleCreateRule = (e) => {
+  const handleCreateRule = async (e) => {
     e.preventDefault();
+    if (!newRule.name) return;
+
     addFirewallRule(newRule);
+
+    // If rule targets an IP address or block range, sync to Cloudflare KV
+    if (newRule.targetIP) {
+      await syncBlacklistToEdge(newRule.targetIP, newRule.description || newRule.name);
+    }
+
     setShowAddModal(false);
     setNewRule({ name: '', description: '', type: 'Heuristic', action: 'Drop', target: 'Global' });
   };
