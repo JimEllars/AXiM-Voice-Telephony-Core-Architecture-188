@@ -4,15 +4,40 @@ import SafeIcon from '../common/SafeIcon';
 import { FiDatabase, FiRefreshCw, FiUser, FiBriefcase, FiPhone, FiClock, FiCheckCircle, FiSearch, FiFilter } from 'react-icons/fi';
 import { Badge } from '../components/common/Badge';
 
+import { useEffect } from 'react';
+
 export const DeskeraSync = () => {
   const { syncLogs, crmContacts, logEvent, addNotification, triggerCrmReconciliation } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('logs');
-  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    let client;
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      client = createClient(supabaseUrl, supabaseKey);
+      const channel = client.channel('deskera-contacts-sync')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crm_contacts' }, (payload) => {
+          if (payload.new) {
+            // Dynamically update crmContacts status in store
+            useVoiceStore.setState(state => ({
+              crmContacts: state.crmContacts.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c)
+            }));
+          }
+        })
+        .subscribe();
+
+      return () => { client && client.removeChannel(channel); };
+    });
+  }, []);
+
   const filteredContacts = crmContacts.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.company.toLowerCase().includes(search.toLowerCase())
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.company.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -113,8 +138,8 @@ export const DeskeraSync = () => {
                     type="text" 
                     placeholder="Search synced contacts..." 
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-cyan-500/50"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
                 <button className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-400">
