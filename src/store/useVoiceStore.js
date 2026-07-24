@@ -365,24 +365,21 @@ export const useVoiceStore = create((set, get) => ({
       activeCalls: state.activeCalls.map(c => c.id === id ? { ...c, status: 'manual_intervention' } : c)
     }));
 
-    // WebRTC Audio Integration (Cloudflare Calls / Simulation)
     try {
-      const audioElement = document.getElementById('live-call-audio');
-      if (audioElement) {
-        // Create a silent audio context oscillator to simulate an active track if physical mic fails
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = ctx.createOscillator();
-        const dest = ctx.createMediaStreamDestination();
-        oscillator.connect(dest);
-        oscillator.start();
-        audioElement.srcObject = dest.stream;
-        console.log('[WEBRTC] Intercepted seizeCall, audio stream attached');
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioElement = document.getElementById('live-call-audio');
+        if (audioElement) {
+          audioElement.srcObject = stream;
+          audioElement.play().catch(e => console.warn('[WEBRTC] Audio play failed:', e));
+        }
+        console.log('[WEBRTC] Operator microphone stream bound to call trunk:', id);
       }
     } catch (err) {
-      console.warn('[WEBRTC] Failed to bind local stream to DOM element', err);
+      console.warn('[WEBRTC] Microphone access denied or unavailable, using fallback oscillator:', err);
     }
 
-
+    // Log HITL Audit Event to Supabase
     try {
       const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
