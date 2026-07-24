@@ -7,7 +7,15 @@ import { useVoiceStore } from '../../store/useVoiceStore';
 import { AudioSpectrum } from './AudioSpectrum';
 
 export const OnyxTranscriptStream = ({ call, onClose }) => {
-  const { seizeCall, addNotification, logEvent } = useVoiceStore();
+  const { seizeCall, addNotification, logEvent, activeCalls, connectLiveTranscriptStream } = useVoiceStore();
+  const activeCall = activeCalls.find(c => c.id === call?.id) || call;
+
+  useEffect(() => {
+    if (!call?.id) return;
+    const cleanup = connectLiveTranscriptStream(call.id);
+    return () => cleanup && cleanup();
+  }, [call?.id, connectLiveTranscriptStream]);
+
   const [messages, setMessages] = useState([
     { id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. How can I assist you today?' }
   ]);
@@ -142,6 +150,25 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
               </div>
             </motion.div>
           ))}
+          {activeCall.liveTranscript && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-4"
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-lg bg-indigo-600 text-white border-indigo-400">
+                <SafeIcon icon={FiCpu} />
+              </div>
+              <div className="flex flex-col max-w-[70%]">
+                <div className="p-4 rounded-2xl text-sm leading-relaxed bg-indigo-500/10 border border-indigo-500/20 text-zinc-200">
+                  {activeCall.liveTranscript}<span className="inline-block w-1.5 h-4 ml-1 bg-indigo-400 animate-pulse" />
+                </div>
+                <span className="text-[9px] mt-1 font-mono text-zinc-600">
+                  ONYX-AI-04 (LIVE STREAM)
+                </span>
+              </div>
+            </motion.div>
+          )}
           {isManual && (
             <div className="flex justify-center py-4">
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest animate-pulse">
