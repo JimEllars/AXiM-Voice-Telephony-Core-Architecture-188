@@ -17,20 +17,18 @@ export const Settings = () => {
     deleteAutoRule, 
     toggleAutoRule,
     addNotification,
-    logEvent
+    logEvent,
+    commitMeshConfiguration
   } = useVoiceStore();
 
   const [newTemplate, setNewTemplate] = useState({ name: '', content: '', type: 'SMS' });
   const [newRule, setNewRule] = useState({ name: '', trigger: '', templateId: '', actionType: 'SMS' });
   const [isCommitting, setIsCommitting] = useState(false);
 
-  const handleCommit = () => {
+  const handleCommit = async () => {
     setIsCommitting(true);
-    setTimeout(() => {
-      setIsCommitting(false);
-      addNotification({ title: 'Config Committed', message: 'Global mesh configuration updated across 14 nodes.', type: 'success' });
-      logEvent('Global Node Configuration Committed', 'sync', 'Admin Terminal');
-    }, 1500);
+    await commitMeshConfiguration();
+    setIsCommitting(false);
   };
 
   return (

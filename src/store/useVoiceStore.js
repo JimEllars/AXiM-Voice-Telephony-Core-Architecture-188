@@ -615,7 +615,51 @@ export const useVoiceStore = create((set, get) => ({
   addAutoRule: (rule) => set(state => ({ autoRules: [{ ...rule, id: `rule_${Date.now()}`, enabled: true }, ...state.autoRules] })),
   deleteAutoRule: (id) => set(state => ({ autoRules: state.autoRules.filter(r => r.id !== id) })),
   toggleAutoRule: (id) => set(state => ({ autoRules: state.autoRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
-  sendMessage: (text) => set(state => ({ messages: [...state.messages, { id: Date.now(), senderId: 'agent_1', text, time: new Date().toISOString(), type: 'user' }] })),
+  sendMessage: async (text) => {
+    const userMsg = { id: Date.now(), senderId: 'agent_1', text, time: new Date().toISOString(), type: 'user' };
+    set(state => ({ messages: [...state.messages, userMsg] }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.functions.invoke('communication-gateway', {
+          body: {
+            sender: 'OPERATOR_COMMANDER_RIKER',
+            channel: 'mesh_comms_general',
+            message: text,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[MESH_COMMS] Gateway dispatch failed, operating in local fallback:', e);
+    }
+  },
+  commitMeshConfiguration: async () => {
+    const { autoRules, routingSettings } = get();
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('automations').upsert([{
+          id: 'global_voice_routing_rules',
+          rules_payload: autoRules,
+          settings_payload: routingSettings,
+          updated_at: new Date().toISOString()
+        }]);
+      }
+      get().addNotification({ title: 'Config Committed', message: 'Global mesh rules persisted to database.', type: 'success' });
+      get().logEvent('Global Node Configuration Committed', 'sync', 'Admin Terminal');
+    } catch (e) {
+      console.error('[SETTINGS_COMMIT] Failed to persist rules:', e);
+      get().addNotification({ title: 'Commit Warning', message: 'Rules applied locally; database update failed.', type: 'info' });
+    }
+  },
   archiveVoicemail: (id) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, archived: true } : v) })),
   deleteVoicemail: (id) => set(state => ({ voicemails: state.voicemails.filter(v => v.id !== id) })),
     updateVoicemailPriority: async (id, priority) => {

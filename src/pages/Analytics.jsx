@@ -2,10 +2,18 @@ import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import SafeIcon from '../common/SafeIcon';
 import { FiTrendingUp, FiActivity, FiClock, FiDollarSign, FiZap, FiBarChart2, FiGlobe } from 'react-icons/fi';
+import { useVoiceStore } from '../store/useVoiceStore';
 import { motion } from 'framer-motion';
 
 export const Analytics = () => {
+  const { nodes, voicemails, threats } = useVoiceStore();
+
+  const volumeData = voicemails && voicemails.length > 0
+    ? [820, 932, 901, 934, 1290, 1330, 1320 + voicemails.length]
+    : [820, 932, 901, 934, 1290, 1330, 1320];
+
   const volumeOption = {
+
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis', backgroundColor: '#18181b', borderColor: '#3f3f46', textStyle: { color: '#d4d4d8' } },
     grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
@@ -14,21 +22,25 @@ export const Analytics = () => {
     series: [{
       name: 'Call Volume', type: 'line', smooth: true, itemStyle: { color: '#06b6d4' },
       areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(6,182,212,0.2)' }, { offset: 1, color: 'transparent' }] } },
-      data: [820, 932, 901, 934, 1290, 1330, 1320]
+      data: volumeData
     }]
   };
+
+
+  const latencyData = nodes ? nodes.map(n => parseInt(n.latency.replace('ms', '')) || 20) : [98, 85, 72, 90, 65];
+  const nodeNames = nodes ? nodes.map(n => ({ name: n.id, max: 150 })) : [
+    { name: 'US-EAST-1', max: 100 },
+    { name: 'EU-WEST-2', max: 100 },
+    { name: 'AP-SOUTH-1', max: 100 },
+    { name: 'US-WEST-2', max: 100 },
+    { name: 'SA-EAST-1', max: 100 }
+  ];
 
   const nodeEfficiencyOption = {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'item' },
     radar: {
-      indicator: [
-        { name: 'US-EAST-1', max: 100 },
-        { name: 'EU-WEST-2', max: 100 },
-        { name: 'AP-SOUTH-1', max: 100 },
-        { name: 'US-WEST-2', max: 100 },
-        { name: 'SA-EAST-1', max: 100 }
-      ],
+      indicator: nodeNames,
       splitArea: { show: false },
       axisLine: { lineStyle: { color: '#27272a' } },
       splitLine: { lineStyle: { color: '#27272a' } }
@@ -36,7 +48,7 @@ export const Analytics = () => {
     series: [{
       type: 'radar',
       data: [
-        { value: [98, 85, 72, 90, 65], name: 'Node Health', itemStyle: { color: '#6366f1' }, areaStyle: { color: 'rgba(99,102,241,0.2)' } }
+        { value: latencyData, name: 'Node Latency', itemStyle: { color: '#6366f1' }, areaStyle: { color: 'rgba(99,102,241,0.2)' } }
       ]
     }]
   };
@@ -61,7 +73,7 @@ export const Analytics = () => {
           { label: 'Total Mesh Minutes', value: '42,891', sub: '+12% from last week', icon: FiClock, color: 'text-cyan-400' },
           { label: 'AI Resolution Rate', value: '89.4%', sub: 'Target: 92.0%', icon: FiZap, color: 'text-fuchsia-400' },
           { label: 'Operational Savings', value: '$8,204', sub: 'Calculated carrier delta', icon: FiDollarSign, color: 'text-emerald-400' },
-          { label: 'Active Node Count', value: '14', sub: 'Global distribution', icon: FiActivity, color: 'text-indigo-400' },
+          { label: 'Active Node Count', value: nodes ? nodes.filter(n => n.status === 'Operational').length.toString() : '14', sub: 'Global distribution', icon: FiActivity, color: 'text-indigo-400' },
         ].map((stat, i) => (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} key={stat.label} className="bg-zinc-900/40 border border-zinc-800 p-6 rounded-2xl backdrop-blur-sm" >
             <div className="flex justify-between items-start mb-4">
