@@ -16,24 +16,52 @@ export const TranscriptCard = ({ voicemail }) => {
   const { updateVoicemailClassification } = useVoiceStore();
   const [isPlaying, setIsPlaying] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const audioRef = React.useRef(null);
 
   React.useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setElapsedSeconds((prev) => {
-          if (prev + 1 >= voicemail.duration) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    } else if (!isPlaying && elapsedSeconds !== 0) {
-      clearInterval(interval);
+    if (!audioRef.current) {
+      audioRef.current = new Audio(voicemail.audioUrl || 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, voicemail.duration]);
+    const audio = audioRef.current;
+
+    const handleTimeUpdate = () => {
+      setElapsedSeconds(Math.floor(audio.currentTime));
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setElapsedSeconds(0);
+      audio.currentTime = 0;
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [voicemail.audioUrl]);
+
+  React.useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      if (isPlaying) {
+        audio.play().catch(e => console.error("Audio playback failed:", e));
+      } else {
+        audio.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  React.useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showClassMenu, setShowClassMenu] = useState(false);

@@ -554,19 +554,33 @@ export const useVoiceStore = create((set, get) => ({
         }
 
         // Inbound Call Simulation
-        if (Math.random() > 0.92 && activeCalls.length < 5) {
-          const id = `call_${Date.now()}`;
-          const newCall = {
-            id,
-            callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
-            status: 'active',
-            intent: 'Connecting...',
-            duration: 0,
-            node: 'US-EAST-1',
-            messages: [{ id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. Routing to node...' }],
-            sentiment: 'neutral'
-          };
-          set(state => ({ activeCalls: [...state.activeCalls, newCall] }));
+        if (Math.random() > 0.92) {
+          if (activeCalls.length < 5) {
+            const id = `call_${Date.now()}`;
+            const newCall = {
+              id,
+              callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
+              status: 'active',
+              intent: 'Connecting...',
+              duration: 0,
+              node: 'US-EAST-1',
+              messages: [{ id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. Routing to node...' }],
+              sentiment: 'neutral'
+            };
+            set(state => ({ activeCalls: [...state.activeCalls, newCall] }));
+          } else {
+            // Trigger overflow telemetry
+            get().dispatchTelemetryError('INBOUND_CALL_OVERFLOW', 'Telephony mesh capacity reached maximum 5 active lines.');
+
+            // Route overflow caller to automated AI voicemail triage
+            const overflowVoicemail = {
+              callerId: `+1 (${Math.floor(Math.random()*900)+100}) 555-${Math.floor(Math.random()*9000)+1000}`,
+              transcript: 'High volume overflow call. Customer requesting immediate billing support.',
+              node: 'US-EAST-1',
+              priority: 'high'
+            };
+            get().processInboundVoicemail(overflowVoicemail);
+          }
         }
 
         set(state => ({
