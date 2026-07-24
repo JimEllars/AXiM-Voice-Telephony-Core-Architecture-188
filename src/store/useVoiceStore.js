@@ -314,16 +314,51 @@ export const useVoiceStore = create((set, get) => ({
     }));
   },
 
-  clearNodeAlert: (id) => set(state => ({ nodeAlerts: state.nodeAlerts.filter(a => a.id !== id) })),
+    clearNodeAlert: async (id) => {
+    set(state => ({ nodeAlerts: state.nodeAlerts.filter(a => a.id !== id) }));
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('telemetry_events').insert([{
+           event_type: 'NODE_ALERT_RESOLVED',
+           target_id: id,
+           resolved_at: new Date().toISOString()
+        }]);
+      }
+    } catch (e) {
+      console.error('[TELEMETRY_SYNC] Failed to persist node alert resolution:', e);
+    }
+    get().logEvent(`[LOAD_BALANCER] Node alert [${id}] cleared and load rebalanced across regional mesh.`, 'system', 'Load Balancer');
+  },
   clearAgentAlert: (id) => set(state => ({ agentAlerts: state.agentAlerts.filter(a => a.id !== id) })),
 
-  rebalanceAgent: (agentId) => {
+    rebalanceAgent: async (agentId) => {
     set(state => ({
       agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available' } : a),
       agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId),
       nodeAlerts: state.nodeAlerts.filter(a => a.nodeId !== agentId)
     }));
-    get().logEvent('Agent load rebalanced', 'system', 'Load Balancer');
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('telemetry_events').insert([{
+           event_type: 'AGENT_REBALANCED',
+           target_id: agentId,
+           resolved_at: new Date().toISOString()
+        }]);
+      }
+    } catch (e) {
+      console.error('[TELEMETRY_SYNC] Failed to persist agent rebalance:', e);
+    }
+
+    get().logEvent(`[LOAD_BALANCER] Node alert [${agentId}] cleared and load rebalanced across regional mesh.`, 'system', 'Load Balancer');
   },
   seizeCall: async (id, operatorId = 'COMMANDER_RIKER') => {
     set(state => ({
@@ -371,6 +406,33 @@ export const useVoiceStore = create((set, get) => ({
   },
 
   // --- SIMULATION ---
+    connectLiveTranscriptStream: (callId) => {
+    const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+    const eventSource = new EventSource(`${workerUrl}/v1/telephony/transcribe-stream?call_id=${callId}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.token) {
+          set(state => ({
+            activeCalls: state.activeCalls.map(c =>
+              c.id === callId ? { ...c, liveTranscript: (c.liveTranscript || '') + data.token } : c
+            )
+          }));
+        }
+      } catch (e) {
+        console.error('[SSE_TRANSCRIPT] Token parse error:', e);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn('[SSE_TRANSCRIPT] Connection error, closing stream:', err);
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  },
+
   subscribeToTelephonyNetwork: () => {
     let reconnectAttempts = 0;
     const maxBackoff = 30000;
@@ -544,8 +606,50 @@ export const useVoiceStore = create((set, get) => ({
   sendMessage: (text) => set(state => ({ messages: [...state.messages, { id: Date.now(), senderId: 'agent_1', text, time: new Date().toISOString(), type: 'user' }] })),
   archiveVoicemail: (id) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, archived: true } : v) })),
   deleteVoicemail: (id) => set(state => ({ voicemails: state.voicemails.filter(v => v.id !== id) })),
-  updateVoicemailPriority: (id, priority) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, priority } : v) })),
-  updateVoicemailClassification: (id, classification) => set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
+    updateVoicemailPriority: async (id, priority) => {
+    set(state => ({ voicemails: state.voicemails.map(v => v.id === id ? { ...v, priority } : v) }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('support_tickets').update({
+          priority: priority,
+          updated_at: new Date().toISOString()
+        }).eq('external_reference_id', id);
+      }
+    } catch (e) {
+      console.error('[TRIAGE_SYNC] Failed to persist manual priority:', e);
+    }
+
+    get().logEvent(`Manual triage override: Voicemail [${id}] priority set to [${priority}]`, 'sync', 'Triage HUD');
+  },
+    updateVoicemailClassification: async (id, classification) => {
+    set(state => ({
+      voicemails: state.voicemails.map(v =>
+        v.id === id ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v
+      )
+    }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('support_tickets').update({
+          category: classification,
+          updated_at: new Date().toISOString()
+        }).eq('external_reference_id', id);
+      }
+    } catch (e) {
+      console.error('[TRIAGE_SYNC] Failed to persist manual classification:', e);
+    }
+
+    get().logEvent(`Manual triage override: Voicemail [${id}] reclassified as [${classification}]`, 'sync', 'Triage HUD');
+  },
   updateMapping: (id, target) => set(state => ({ fieldMappings: state.fieldMappings.map(m => m.id === id ? { ...m, target } : m) })),
   bulkUpdateClassification: (ids, classification) => set(state => ({ voicemails: state.voicemails.map(v => ids.includes(v.id) ? { ...v, classification, isManualCorrection: true, confidence: 100 } : v )})),
   setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
