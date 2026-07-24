@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVoiceStore } from '../store/useVoiceStore';
 import SafeIcon from '../common/SafeIcon';
 import { FiShield, FiAlertOctagon, FiPlus, FiGlobe, FiEye, FiSearch, FiSliders, FiActivity, FiCheckCircle } from 'react-icons/fi';
@@ -9,11 +9,45 @@ import { ThreatRadar } from '../components/security/ThreatRadar';
 import { ThreatDetailsModal } from '../components/security/ThreatDetailsModal';
 
 export const AsguardFirewall = () => {
-  const { threats, threatMetrics, firewallRules, addFirewallRule, whitelistNumber } = useVoiceStore();
+  const { threats, threatMetrics, firewallRules, addFirewallRule, whitelistNumber, addThreat } = useVoiceStore();
   const [activeTab, setActiveTab] = useState('radar');
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRule, setNewRule] = useState({ name: '', description: '', type: 'Heuristic', action: 'Drop', target: 'Global' });
+
+
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) return;
+
+    let client;
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      client = createClient(supabaseUrl, supabaseKey);
+
+      const channel = client.channel('public:ticket_ai_telemetry')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_ai_telemetry' }, payload => {
+          if (payload.new && (payload.new.threat_detected === true || payload.new.severity === 'critical')) {
+            const incomingThreat = {
+              id: payload.new.id || `threat_${Date.now()}`,
+              callerId: payload.new.caller_id || 'Unknown Entity',
+              type: payload.new.threat_type || 'Heuristic Flag',
+              score: payload.new.threat_score || Math.floor(Math.random() * 20) + 80,
+              region: payload.new.origin_region || 'Unknown',
+              reputation: payload.new.severity || 'Critical',
+              ip: payload.new.ip_address || ''
+            };
+            addThreat(incomingThreat);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        client.removeChannel(channel);
+      };
+    }).catch(err => console.error('[ASGUARD] Failed to load Supabase client:', err));
+  }, [addThreat]);
 
   const handleCreateRule = (e) => {
     e.preventDefault();

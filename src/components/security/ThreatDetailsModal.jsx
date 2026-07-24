@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
 import { FiX, FiShield, FiGlobe, FiActivity, FiUserPlus, FiSlash, FiAlertCircle } from 'react-icons/fi';
 import { Badge } from '../common/Badge';
+import { useVoiceStore } from '../../store/useVoiceStore';
 
 export const ThreatDetailsModal = ({ threat, onClose, onWhitelist }) => {
+  const syncBlacklistToEdge = useVoiceStore(state => state.syncBlacklistToEdge);
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -89,6 +91,10 @@ export const ThreatDetailsModal = ({ threat, onClose, onWhitelist }) => {
               <SafeIcon icon={FiUserPlus} /> Whitelist Entity
             </button>
             <button 
+              onClick={() => {
+                if (threat.ip) syncBlacklistToEdge(threat.ip, 'Manual Permanent Ban');
+                onClose();
+              }}
               className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold transition-all border border-zinc-700 flex items-center justify-center gap-2"
             >
               <SafeIcon icon={FiSlash} /> Permanent IP Ban
