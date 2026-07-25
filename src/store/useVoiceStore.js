@@ -607,6 +607,49 @@ export const useVoiceStore = create((set, get) => ({
     });
   },
   addNotification: (n) => set(state => ({ notifications: [{ id: Date.now(), ...n, time: new Date() }, ...state.notifications].slice(0, 5) })),
+
+
+  queryVectorMemory: async (searchQuery) => {
+    if (!searchQuery.trim()) return;
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        const { data } = await client.functions.invoke('memory-retrieval', {
+          body: { query: searchQuery, match_threshold: 0.7, match_count: 5 }
+        });
+        if (data && data.results) {
+          // Merge similarity search results into contextDocuments view
+          // Let's replace the context documents entirely with results? No, let's just return it, and knowledgebase will handle it.
+          return data.results;
+        }
+      }
+    } catch (e) {
+      console.warn('[RAG_SEARCH] Vector retrieval failed, falling back to local filter:', e);
+    }
+  },
+  setCrmProvider: async (provider) => {
+    set({ crmProvider: provider });
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('automations').upsert([{
+          id: 'active_crm_provider_config',
+          selected_provider: provider,
+          updated_at: new Date().toISOString()
+        }]);
+      }
+      get().addNotification({ title: 'Provider Set', message: `Active CRM switched to ${provider}`, type: 'success' });
+    } catch (e) {
+      console.warn('[CRM_CONFIG] Failed to persist CRM provider:', e);
+    }
+  },
+
   removeNotification: (id) => set(state => ({ notifications: state.notifications.filter(n => n.id !== id) })),
   logEvent: (event, type = 'info', source = 'System') => set(state => ({ auditLogs: [{ id: Date.now(), event, type, source, time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50) })),
   addAgent: async (agent) => {
