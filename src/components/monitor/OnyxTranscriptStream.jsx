@@ -20,6 +20,7 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
     { id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. How can I assist you today?' }
   ]);
   const [isMuted, setIsMuted] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
 
   const isManual = call.status === 'manual_intervention';
@@ -75,8 +76,10 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
   }, [call?.id, isManual]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (autoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, autoScroll, activeCall.liveTranscript]);
 
   const handleSeize = () => {
     seizeCall(call.id);
@@ -120,6 +123,12 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
           <div className="flex items-center gap-4">
             <div className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest">Audio Stream</div>
             <AudioSpectrum isActive={true} />
+            <button
+              onClick={() => setAutoScroll(!autoScroll)}
+              className={`ml-4 text-[9px] uppercase font-bold tracking-widest px-2 py-1 rounded transition-colors ${autoScroll ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'}`}
+            >
+              {autoScroll ? 'Auto-Scroll: ON' : 'Auto-Scroll: OFF'}
+            </button>
           </div>
           <div className="flex gap-4 text-[9px] font-mono text-zinc-500">
             <span>BITRATE: 320 KBPS</span>

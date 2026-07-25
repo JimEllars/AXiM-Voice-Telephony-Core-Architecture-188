@@ -593,9 +593,37 @@ export const useVoiceStore = create((set, get) => ({
   // --- HELPERS ---
   addFirewallRule: (rule) => set(state => ({ firewallRules: [{ ...rule, id: `fr_${Date.now()}`, enabled: true }, ...state.firewallRules] })),
   addThreat: (threat) => set(state => ({ threats: [threat, ...state.threats].slice(0, 50) })),
-  whitelistNumber: (number) => set(state => ({ threats: state.threats.filter(t => t.callerId !== number) })),
+  whitelistNumber: (number) => {
+    set(state => ({ threats: state.threats.filter(t => t.callerId !== number) }));
+    get().removeBlacklistFromEdge(number, 'Whitelisted by operator');
+  },
   toggleFirewallRule: (id) => set(state => ({ firewallRules: state.firewallRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
-  deleteFirewallRule: (id) => set(state => ({ firewallRules: state.firewallRules.filter(r => r.id !== id) })),
+  deleteFirewallRule: (id) => {
+    const rule = get().firewallRules.find(r => r.id === id);
+    if (rule && rule.target) {
+      get().removeBlacklistFromEdge(rule.target, 'Firewall rule deleted');
+    }
+    set(state => ({ firewallRules: state.firewallRules.filter(r => r.id !== id) }));
+  },
+
+  removeBlacklistFromEdge: async (ipOrNumber, reason) => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      const res = await fetch(`${workerUrl}/v1/security/blacklist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+        },
+        body: JSON.stringify({ ip: ipOrNumber, reason, action: 'REMOVE' })
+      });
+      if (res.ok) {
+        get().addNotification({ type: 'success', title: 'Edge WAF Updated', message: `Key ${ipOrNumber} removed from Cloudflare ASGUARD_BLACKLIST KV.` });
+      }
+    } catch (err) {
+      console.error('[ASGUARD] Failed to sync unblock to edge:', err);
+    }
+  },
   fetchVoicemails: async () => {
     // Simulate fetching / resetting voicemail queue
     return new Promise((resolve) => {
