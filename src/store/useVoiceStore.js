@@ -609,12 +609,47 @@ export const useVoiceStore = create((set, get) => ({
   addNotification: (n) => set(state => ({ notifications: [{ id: Date.now(), ...n, time: new Date() }, ...state.notifications].slice(0, 5) })),
   removeNotification: (id) => set(state => ({ notifications: state.notifications.filter(n => n.id !== id) })),
   logEvent: (event, type = 'info', source = 'System') => set(state => ({ auditLogs: [{ id: Date.now(), event, type, source, time: new Date().toISOString() }, ...state.auditLogs].slice(0, 50) })),
-  addAgent: (agent) => set(state => ({ agents: [...state.agents, { ...agent, id: `agent_${Date.now()}`, status: 'Available', load: 0, metrics: { resolutionRate: 0, callsHandled: 0, avgHandlingTime: '0s' } }] })),
+  addAgent: async (agent) => {
+    const newAgent = {
+      ...agent,
+      id: `agent_${Date.now()}`,
+      status: 'Available',
+      load: 0,
+      metrics: { resolutionRate: 0, callsHandled: 0, avgHandlingTime: '0s' }
+    };
+    set(state => ({ agents: [...state.agents, newAgent] }));
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.from('telemetry_events').insert([{
+          event_type: 'AGENT_DEPLOYED',
+          component_origin: 'AXiM Voice Telephony Core',
+          target_id: newAgent.id,
+          details: { name: newAgent.name, role: newAgent.role, node: newAgent.node },
+          timestamp: new Date().toISOString()
+        }]);
+      }
+    } catch (e) {
+      console.warn('[AGENT_DEPLOY] Failed to log deployment telemetry:', e);
+    }
+
+    get().logEvent(`New agent [${newAgent.name}] deployed to region [${newAgent.node || 'US-EAST-1'}]`, 'system', 'Agent Roster');
+  },
   updateAgentDept: (agentId, deptId) => set(state => ({ agents: state.agents.map(a => a.id === agentId ? { ...a, deptId } : a) })),
   updateRouting: (settings) => set(state => ({ routingSettings: { ...state.routingSettings, ...settings } })),
   addAutoRule: (rule) => set(state => ({ autoRules: [{ ...rule, id: `rule_${Date.now()}`, enabled: true }, ...state.autoRules] })),
-  deleteAutoRule: (id) => set(state => ({ autoRules: state.autoRules.filter(r => r.id !== id) })),
-  toggleAutoRule: (id) => set(state => ({ autoRules: state.autoRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) })),
+  deleteAutoRule: (id) => {
+    set(state => ({ autoRules: state.autoRules.filter(r => r.id !== id) }));
+    get().commitMeshConfiguration();
+  },
+  toggleAutoRule: (id) => {
+    set(state => ({ autoRules: state.autoRules.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r) }));
+    get().commitMeshConfiguration();
+  },
   sendMessage: async (text) => {
     const userMsg = { id: Date.now(), senderId: 'agent_1', text, time: new Date().toISOString(), type: 'user' };
     set(state => ({ messages: [...state.messages, userMsg] }));
