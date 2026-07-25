@@ -28,6 +28,37 @@ export const ResponseTemplateModal = ({ voicemail, onClose }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
+
+  const handleDispatch = async (selectedTemplate) => {
+    if (!selectedTemplate) return;
+    setIsProcessing(true);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(supabaseUrl, supabaseKey);
+        await client.functions.invoke(selectedTemplate.type === 'Email' ? 'send-email' : 'communication-gateway', {
+          body: {
+            recipient: voicemail.callerId || voicemail.email,
+            template_id: selectedTemplate.id,
+            content: selectedTemplate.content,
+            reference_id: voicemail.id
+          }
+        });
+      }
+      setSuccessMsg(`Dispatched ${selectedTemplate.name}`);
+      setTimeout(() => {
+        setSuccessMsg('');
+        onClose();
+      }, 1500);
+    } catch (e) {
+      console.error('[TEMPLATE_DISPATCH] Dispatch failed:', e);
+      setIsProcessing(false);
+    }
+  };
+
   const handleAction = (type, detail) => {
     setIsProcessing(true);
     setTimeout(() => {
@@ -83,7 +114,7 @@ export const ResponseTemplateModal = ({ voicemail, onClose }) => {
                     {templates.map((template) => (
                       <button 
                         key={template.id} 
-                        onClick={() => handleAction(template.type, `Sent template: ${template.name}`)}
+                        onClick={() => handleDispatch(template)}
                         className="text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:border-indigo-500/50 hover:bg-zinc-800/50 transition-all group"
                       >
                         <div className="flex items-center justify-between mb-2">

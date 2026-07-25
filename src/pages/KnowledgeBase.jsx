@@ -10,14 +10,30 @@ const iconMap = {
 };
 
 export const KnowledgeBase = () => {
-  const { departments, contextDocuments, agents, addContextDoc, deleteContextDoc } = useVoiceStore();
+  const { departments, contextDocuments, agents, addContextDoc, deleteContextDoc, queryVectorMemory } = useVoiceStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
   const [view, setView] = useState('department'); // 'department' or 'agent'
   const [selectedId, setSelectedId] = useState('dept_1');
   const [showUpload, setShowUpload] = useState(false);
   const [newDoc, setNewDoc] = useState({ name: '', type: 'Protocol', size: '1.5MB', content: '' });
 
-  const filteredDocs = contextDocuments.filter(d => d.targetId === selectedId && d.targetType === view);
+  const filteredDocs = searchResults || contextDocuments.filter(d => d.targetId === selectedId && d.targetType === view);
   
+
+  const handleSearch = async (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    if (val.trim()) {
+      const results = await queryVectorMemory(val);
+      if (results) {
+        setSearchResults(results.map(r => ({...r, id: r.id || r.metadata?.id || Math.random().toString(), name: r.metadata?.name || 'Search Result', type: r.metadata?.type || 'Vector Match', size: 'N/A', embeddingStatus: 'VECTORIZED'})));
+      }
+    } else {
+      setSearchResults(null);
+    }
+  };
+
   const handleUpload = (e) => {
     e.preventDefault();
     // Pass new document content to addContextDoc to trigger embedding generation
@@ -40,6 +56,7 @@ export const KnowledgeBase = () => {
         </button>
       </div>
 
+
       <div className="flex bg-zinc-900/50 p-1 rounded-xl border border-zinc-800 w-fit">
         <button onClick={() => { setView('department'); setSelectedId('dept_1'); }} className={`px-4 py-2 text-[10px] uppercase font-bold rounded-lg transition-all ${view === 'department' ? 'bg-indigo-500 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>
           Department Protocols
@@ -48,6 +65,17 @@ export const KnowledgeBase = () => {
           Agent Personas
         </button>
       </div>
+      <div className="relative">
+        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <input
+          type="text"
+          placeholder="Search Knowledge Base via Vector Retrieval..."
+          value={searchQuery}
+          onChange={handleSearch}
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-indigo-500/50"
+        />
+      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1 space-y-2">
