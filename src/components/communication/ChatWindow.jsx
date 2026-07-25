@@ -10,9 +10,39 @@ export const ChatWindow = () => {
   const [input, setInput] = useState('');
   const scrollRef = useRef(null);
 
+
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    let client;
+    let channel;
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      client = createClient(supabaseUrl, supabaseKey);
+      channel = client.channel('mesh-comms-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, (payload) => {
+          if (payload.new && payload.new.type === 'COMMUNICATION_MESSAGE') {
+            const incomingMsg = {
+              id: payload.new.id || Date.now(),
+              senderId: payload.new.sender || 'onyx_agent',
+              text: payload.new.message || payload.new.details,
+              time: payload.new.created_at || new Date().toISOString(),
+              type: 'agent'
+            };
+            useVoiceStore.setState(state => ({ messages: [...state.messages, incomingMsg] }));
+          }
+        })
+        .subscribe();
+    });
+
+    return () => { if (client && channel) client.removeChannel(channel); };
+  }, []);
+
 
   const handleSend = (e) => {
     e.preventDefault();
