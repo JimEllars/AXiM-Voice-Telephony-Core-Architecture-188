@@ -64,7 +64,16 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
             }]);
           }
         })
-        .subscribe();
+        .subscribe((status, err) => {
+          if (status === 'CHANNEL_ERROR') {
+            addNotification({
+              title: 'Telemetry Warning',
+              message: 'Live transcript stream connection degraded.',
+              type: 'error'
+            });
+            console.warn('[REALTIME_DROP] Transcript channel error:', err);
+          }
+        });
     });
 
     return () => {
