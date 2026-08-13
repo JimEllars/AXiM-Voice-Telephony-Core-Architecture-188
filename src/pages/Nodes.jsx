@@ -6,7 +6,7 @@ import { Badge } from '../components/common/Badge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Nodes = () => {
-  const { nodes, toggleNode, logEvent, addNotification, nodeAlerts, clearNodeAlert } = useVoiceStore();
+  const { nodes, toggleNode, pingNode, logEvent, addNotification, nodeAlerts, clearNodeAlert } = useVoiceStore();
   
   const handleReboot = () => {
     addNotification({
@@ -145,6 +145,12 @@ export const Nodes = () => {
                   }`}
                 >
                   {node.status === 'Online' ? 'Deactivate' : 'Activate'}
+                </button>
+                <button
+                  onClick={() => pingNode(node.id)}
+                  className="flex-1 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-cyan-400 transition-colors"
+                >
+                  Ping Node
                 </button>
                 <button className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 hover:text-indigo-400 transition-colors">
                   <SafeIcon icon={FiExternalLink} />

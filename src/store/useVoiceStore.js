@@ -65,6 +65,28 @@ export const useVoiceStore = create((set, get) => ({
   messages: [],
 
   // --- CORE ACTIONS ---
+    toggleNode: (nodeId) => {
+    set(state => ({
+      nodes: state.nodes.map(node => {
+        if (node.id === nodeId) {
+          return { ...node, status: node.status === 'Online' ? 'Offline' : 'Online' };
+        }
+        return node;
+      })
+    }));
+  },
+  pingNode: async (nodeId) => {
+    try {
+      const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      const res = await fetch(`${workerUrl}/v1/health`);
+      if (!res.ok) throw new Error('Failed to ping node');
+      return true;
+    } catch (e) {
+      console.warn(`[NODE_PING] Failed to ping node ${nodeId}:`, e);
+      get().addNotification({ title: 'Ping Failed', message: 'Node unreachable or timeout occurred', type: 'error' });
+      return false;
+    }
+  },
   syncBlacklistToEdge: async (ipAddress, reason) => {
     try {
       const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';

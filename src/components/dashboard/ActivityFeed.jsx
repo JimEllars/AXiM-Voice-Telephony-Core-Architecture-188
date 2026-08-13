@@ -20,10 +20,27 @@ export const ActivityFeed = () => {
   const [activeTab, setActiveTab] = useState('All');
 
   const handleExport = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
+    // Generate CSV string
+    const headers = ['ID', 'Type', 'Event', 'Source', 'Time'];
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+
+    auditLogs.forEach(log => {
+      const row = [
+        `"${log.id}"`,
+        `"${log.type}"`,
+        `"${log.event}"`,
+        `"${log.source}"`,
+        `"${new Date(log.time).toISOString()}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const dataStr = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvString);
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute('href', dataStr);
-    downloadAnchorNode.setAttribute('download', 'axim-telephony-audit.json');
+    downloadAnchorNode.setAttribute('download', `telemetry_audit_export_${Date.now()}.csv`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -88,7 +105,7 @@ export const ActivityFeed = () => {
                 </h3>
                 <div className="flex gap-4">
                   <button onClick={handleExport} className="flex items-center gap-2 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-cyan-500/50 transition-colors text-zinc-300 text-sm">
-                    <SafeIcon icon={FiDownload} /> Export JSON
+                    <SafeIcon icon={FiDownload} /> Export CSV
                   </button>
                   <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-zinc-300">
                     <SafeIcon icon={FiX} />
