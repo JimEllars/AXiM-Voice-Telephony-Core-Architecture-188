@@ -910,7 +910,7 @@ export const useVoiceStore = create((set, get) => ({
     const THREE_HOURS = 10800000;
     set(state => ({
       activeCalls: state.activeCalls.filter(call => {
-        const callTime = call.startTime || (call.id && call.id.startsWith('call_') ? parseInt(call.id.replace('call_', '')) : now);
+        const callTime = call.timestamp || call.startTime || (call.id && typeof call.id === 'string' && call.id.startsWith('call_') ? parseInt(call.id.replace('call_', ''), 10) : now);
         return (now - callTime) < THREE_HOURS;
       })
     }));
@@ -919,7 +919,3 @@ export const useVoiceStore = create((set, get) => ({
 
 }));
 
-// Periodically clean up stale calls
-setInterval(() => {
-  useVoiceStore.getState().cleanupStaleCalls();
-}, 15 * 60 * 1000);
