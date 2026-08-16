@@ -20,6 +20,15 @@ export const ActivityFeed = () => {
   const [activeTab, setActiveTab] = useState('All');
 
   const handleExport = () => {
+    const escapeCSV = (field) => {
+      if (field == null) return '""';
+      const str = String(field);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
     // Generate CSV string
     const headers = ['ID', 'Type', 'Event', 'Source', 'Time'];
     const csvRows = [];
@@ -27,11 +36,11 @@ export const ActivityFeed = () => {
 
     auditLogs.forEach(log => {
       const row = [
-        `"${log.id}"`,
-        `"${log.type}"`,
-        `"${log.event}"`,
-        `"${log.source}"`,
-        `"${new Date(log.time).toISOString()}"`
+        escapeCSV(log.id),
+        escapeCSV(log.type),
+        escapeCSV(log.event),
+        escapeCSV(log.source),
+        escapeCSV(new Date(log.time).toISOString())
       ];
       csvRows.push(row.join(','));
     });
