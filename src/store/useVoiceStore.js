@@ -90,6 +90,7 @@ export const useVoiceStore = create((set, get) => ({
   syncBlacklistToEdge: async (ipAddress, reason) => {
     try {
       const workerUrl = import.meta.env.VITE_WORKER_INGRESS_URL || 'https://api.axim.us.com';
+      const startTime = performance.now();
       const res = await fetch(`${workerUrl}/v1/security/blacklist`, {
         method: 'POST',
         headers: {
@@ -98,9 +99,12 @@ export const useVoiceStore = create((set, get) => ({
         },
         body: JSON.stringify({ ip: ipAddress, reason, action: 'BLOCK' })
       });
+      const endTime = performance.now();
+      const latency = Math.round(endTime - startTime);
 
       if (res.ok) {
-        get().addNotification({ type: 'success', title: 'Edge WAF Updated', message: `IP ${ipAddress} synchronized to Cloudflare ASGUARD_BLACKLIST KV.` });
+        get().addNotification({ type: 'success', title: 'Edge WAF Updated', message: `IP ${ipAddress} synchronized to Cloudflare ASGUARD_BLACKLIST KV in ${latency}ms.` });
+        get().logEvent(`WAF sync for ${ipAddress} completed in ${latency}ms`, 'security', 'Edge Sync');
       } else {
         get().addNotification({ type: 'error', title: 'Edge WAF Sync Failed', message: `Failed to block ${ipAddress}` });
       }
