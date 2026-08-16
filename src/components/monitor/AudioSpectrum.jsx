@@ -107,6 +107,7 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
     return () => {
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             audioContextRef.current.close().catch(console.error);
+            audioContextRef.current = null;
         }
     };
   }, []);

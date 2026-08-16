@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useVoiceStore } from './store/useVoiceStore';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -19,6 +20,20 @@ import { NotificationToast } from './components/layout/NotificationToast';
 import { DeskeraSync } from './pages/DeskeraSync';
 
 function App() {
+  const cleanupStaleCalls = useVoiceStore(state => state.cleanupStaleCalls);
+
+  useEffect(() => {
+    // Initial cleanup
+    cleanupStaleCalls();
+
+    // Set up periodic cleanup every 15 minutes (900000 ms)
+    const intervalId = setInterval(() => {
+      cleanupStaleCalls();
+    }, 15 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [cleanupStaleCalls]);
+
   return (
     <Router>
       <div className="min-h-screen bg-zinc-950 text-zinc-300 font-sans flex flex-col selection:bg-indigo-500/30">
