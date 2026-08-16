@@ -117,7 +117,10 @@ export const useVoiceStore = create((set, get) => ({
     try {
       const supabaseUrl = import.meta.env.VITE_AXIM_CORE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_AXIM_CORE_ANON_KEY;
-      if (!supabaseUrl || !supabaseKey) return;
+      if (!supabaseUrl || !supabaseKey) {
+        get().addNotification({ type: 'warning', title: 'Telemetry Dispatch Offline', message: 'Supabase credentials missing. Audits will not be saved.' });
+        return;
+      }
 
       const payload = {
         telemetry_envelope: {
@@ -902,6 +905,21 @@ export const useVoiceStore = create((set, get) => ({
 
     get().logEvent(`Bulk triage override: [${ids.length}] voicemails reclassified as [${classification}]`, 'sync', 'Triage HUD');
   },
+    cleanupStaleCalls: () => {
+    const now = Date.now();
+    const THREE_HOURS = 10800000;
+    set(state => ({
+      activeCalls: state.activeCalls.filter(call => {
+        const callTime = call.startTime || (call.id && call.id.startsWith('call_') ? parseInt(call.id.replace('call_', '')) : now);
+        return (now - callTime) < THREE_HOURS;
+      })
+    }));
+  },
   setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
 
 }));
+
+// Periodically clean up stale calls
+setInterval(() => {
+  useVoiceStore.getState().cleanupStaleCalls();
+}, 15 * 60 * 1000);
