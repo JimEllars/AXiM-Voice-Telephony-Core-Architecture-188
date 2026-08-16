@@ -19,7 +19,7 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
   const [messages, setMessages] = useState([
     { id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. How can I assist you today?' }
   ]);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
 
@@ -131,7 +131,7 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
         <div className="bg-zinc-900/30 px-6 py-3 border-b border-zinc-800/50 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="text-[9px] uppercase font-bold text-zinc-500 tracking-widest">Audio Stream</div>
-            <AudioSpectrum isActive={true} />
+            <AudioSpectrum isActive={true} isLive={!isMuted || isManual} />
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`ml-4 text-[9px] uppercase font-bold tracking-widest px-2 py-1 rounded transition-colors ${autoScroll ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'}`}
