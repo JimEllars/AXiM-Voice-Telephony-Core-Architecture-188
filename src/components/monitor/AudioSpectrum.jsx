@@ -8,6 +8,7 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
   const sourceRef = useRef(null);
+  const streamRef = useRef(null);
 
   const initAudio = async () => {
     try {
@@ -17,9 +18,16 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
         analyserRef.current.fftSize = 64;
         const bufferLength = analyserRef.current.frequencyBinCount;
         dataArrayRef.current = new Uint8Array(bufferLength);
+      }
 
+      if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
         // Get microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        streamRef.current = stream;
+
+        if (sourceRef.current) {
+          sourceRef.current.disconnect();
+        }
         sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
         sourceRef.current.connect(analyserRef.current);
       }
@@ -72,6 +80,9 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
       } else {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         requestRef.current = requestAnimationFrame(animateSynthetic);
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
       }
     } else {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
@@ -79,9 +90,15 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
       if (audioContextRef.current && audioContextRef.current.state !== 'suspended') {
         audioContextRef.current.suspend();
       }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     }
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
   }, [isActive, isLive]);
 
