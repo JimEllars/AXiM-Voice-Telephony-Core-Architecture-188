@@ -87,8 +87,9 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
     } else {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       setBars(new Array(20).fill(2));
-      if (audioContextRef.current && audioContextRef.current.state !== 'suspended') {
-        audioContextRef.current.suspend();
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -98,6 +99,10 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
       }
     };
   }, [isActive, isLive]);
