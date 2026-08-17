@@ -196,22 +196,48 @@ export const useVoiceStore = create((set, get) => ({
         ]
       };
 
-      // Update State
-      set(state => ({
-        voicemails: [newVm, ...state.voicemails],
-        entities: extraction.email ? [
-          {
-            id: `ent_${Date.now()}`,
-            name: extraction.name,
-            company: extraction.company,
-            status: 'Lead',
-            sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
-            lastContact: 'Just Now',
-            extractedData: extraction
-          },
-          ...state.entities
-        ] : state.entities
-      }));
+      // Update State with Entity De-Duplication
+      set(state => {
+        let newEntities = [...state.entities];
+        if (extraction && (extraction.email || extraction.phone)) {
+          const existingEntityIndex = state.entities.findIndex(e => {
+            if (extraction.email && e.extractedData && e.extractedData.email === extraction.email) return true;
+            if (extraction.phone && e.extractedData && e.extractedData.phone === extraction.phone) return true;
+            return false;
+          });
+
+          if (existingEntityIndex !== -1) {
+            // Update existing entity
+            newEntities[existingEntityIndex] = {
+              ...newEntities[existingEntityIndex],
+              lastContact: 'Just Now',
+              sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
+              extractedData: {
+                ...newEntities[existingEntityIndex].extractedData,
+                ...extraction
+              }
+            };
+          } else {
+            // Create new entity
+            newEntities = [
+              {
+                id: `ent_${Date.now()}`,
+                name: extraction.name || 'Unknown Contact',
+                company: extraction.company || 'Independent Entity',
+                status: 'Lead',
+                sentiment: analysis.sentiment === 'positive' ? 'Positive' : 'Neutral',
+                lastContact: 'Just Now',
+                extractedData: extraction
+              },
+              ...newEntities
+            ];
+          }
+        }
+        return {
+          voicemails: [newVm, ...state.voicemails],
+          entities: newEntities
+        };
+      });
 
       if (extraction && (extraction.email || extraction.phone)) {
         const enrichmentPayload = {
@@ -522,6 +548,9 @@ export const useVoiceStore = create((set, get) => ({
 
     const interval = setInterval(() => {
       const { activeCalls, agents, connectionStatus } = get();
+
+      // Automate call garbage collection
+      get().cleanupStaleCalls();
       
       if (connectionStatus !== 'connected') return;
 
