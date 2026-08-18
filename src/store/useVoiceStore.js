@@ -278,7 +278,7 @@ export const useVoiceStore = create((set, get) => ({
   },
 
   executeRules: (voicemail) => {
-    const { autoRules, templates, routingSettings } = get();
+    const { autoRules, templates, routingSettings, entities } = get();
     if (!routingSettings.autoResponseEnabled) return;
 
     autoRules.forEach(rule => {
@@ -288,6 +288,27 @@ export const useVoiceStore = create((set, get) => ({
       const matches = triggerWords.some(word => voicemail.transcript.toLowerCase().includes(word));
 
       if (matches) {
+        // Anti-Spam Cooldown Check
+        if (voicemail.callerId) {
+          const entityIndex = entities.findIndex(e => e.extractedData && (e.extractedData.phone === voicemail.callerId));
+          if (entityIndex !== -1) {
+            const entity = entities[entityIndex];
+            if (entity.lastAutomatedResponseTime && (Date.now() - entity.lastAutomatedResponseTime < 900000)) { // 15 mins
+              get().logEvent(`Automated response suppressed for ${voicemail.callerId} (Cooldown active)`, 'info', 'Automation Engine');
+              return;
+            }
+            // Update the entity's lastAutomatedResponseTime
+            set(state => {
+              const newEntities = [...state.entities];
+              newEntities[entityIndex] = {
+                ...newEntities[entityIndex],
+                lastAutomatedResponseTime: Date.now()
+              };
+              return { entities: newEntities };
+            });
+          }
+        }
+
         const template = templates.find(t => t.id === rule.templateId);
         const actionDetail = `Rule "${rule.name}" triggered: ${rule.actionType}`;
         
@@ -937,6 +958,18 @@ export const useVoiceStore = create((set, get) => ({
     cleanupStaleCalls: () => {
     const now = Date.now();
     const THREE_HOURS = 10800000;
+    const { activeCalls } = get();
+
+    const staleCalls = activeCalls.filter(call => {
+      const callTime = call.timestamp || call.startTime || (call.id && typeof call.id === 'string' && call.id.startsWith('call_') ? parseInt(call.id.replace('call_', ''), 10) : now);
+      return (now - callTime) >= THREE_HOURS;
+    });
+
+    if (staleCalls.length > 0) {
+      get().logEvent(`[GARBAGE_COLLECTION] Swept ${staleCalls.length} orphaned active call(s)`, 'system', 'Voice Orchestrator');
+      get().dispatchTelemetryError('ORPHANED_CALL_SWEPT', `Removed ${staleCalls.length} stale sessions.`);
+    }
+
     set(state => ({
       activeCalls: state.activeCalls.filter(call => {
         const callTime = call.timestamp || call.startTime || (call.id && typeof call.id === 'string' && call.id.startsWith('call_') ? parseInt(call.id.replace('call_', ''), 10) : now);
