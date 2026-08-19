@@ -95,7 +95,8 @@ export const useVoiceStore = create((set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`
         },
         body: JSON.stringify({ ip: ipAddress, reason, action: 'BLOCK' })
       });
@@ -349,6 +350,7 @@ export const useVoiceStore = create((set, get) => ({
         headers: {
           'Content-Type': 'application/json',
           'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`,
           'X-AXiM-Gateway-Trace': `req_${Date.now()}_voice_telephony`
         },
         body: JSON.stringify({ model: '@cf/baai/bge-large-en-v1.5', text: doc.content })
@@ -413,7 +415,7 @@ export const useVoiceStore = create((set, get) => ({
 
     rebalanceAgent: async (agentId) => {
     set(state => ({
-      agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available' } : a),
+      agents: state.agents.map(a => a.id === agentId ? { ...a, load: 40, status: 'Available', rebalanceCooldown: Date.now() } : a),
       agentAlerts: state.agentAlerts.filter(a => a.agentId !== agentId),
       nodeAlerts: state.nodeAlerts.filter(a => a.nodeId !== agentId)
     }));
@@ -577,10 +579,16 @@ export const useVoiceStore = create((set, get) => ({
 
       try {
         // Random Load Fluctuations
-        const updatedAgents = agents.map(agent => ({
-          ...agent,
-          load: Math.min(Math.max(agent.load + (Math.floor(Math.random() * 8) - 3), 0), 100)
-        }));
+        const now = Date.now();
+        const updatedAgents = agents.map(agent => {
+          if (agent.rebalanceCooldown && now - agent.rebalanceCooldown < 10000) {
+            return { ...agent, load: 40 };
+          }
+          return {
+            ...agent,
+            load: Math.min(Math.max(agent.load + (Math.floor(Math.random() * 8) - 3), 0), 100)
+          };
+        });
 
         // Latency jitter
         const currentLatency = get().latency;
@@ -692,7 +700,8 @@ export const useVoiceStore = create((set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || ''
+          'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`
         },
         body: JSON.stringify({ ip: ipOrNumber, reason, action: 'REMOVE' })
       });
@@ -903,6 +912,7 @@ export const useVoiceStore = create((set, get) => ({
         headers: {
           'Content-Type': 'application/json',
           'X-AXiM-Internal-Auth': import.meta.env.VITE_AXIM_INTERNAL_KEY || '',
+          'Authorization': `Bearer ${import.meta.env.VITE_AXIM_INTERNAL_KEY || ''}`,
           'X-AXiM-Gateway-Trace': `req_${Date.now()}_voice_telephony`
         },
         body: JSON.stringify({
