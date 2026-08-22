@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
-import { FiCpu, FiUser, FiX, FiPhoneIncoming, FiMic, FiMicOff, FiTrendingUp, FiCrosshair, FiGlobe } from 'react-icons/fi';
+import { FiCpu, FiUser, FiX, FiPhoneIncoming, FiPhoneOff, FiMic, FiMicOff, FiTrendingUp, FiCrosshair, FiGlobe } from 'react-icons/fi';
 import { Badge } from '../common/Badge';
 import { useVoiceStore } from '../../store/useVoiceStore';
 import { AudioSpectrum } from './AudioSpectrum';
 
 export const OnyxTranscriptStream = ({ call, onClose }) => {
-  const { seizeCall, addNotification, logEvent, activeCalls, connectLiveTranscriptStream } = useVoiceStore();
+  const { seizeCall, addNotification, logEvent, activeCalls, connectLiveTranscriptStream, endCall } = useVoiceStore();
   const activeCall = activeCalls.find(c => c.id === call?.id) || call;
 
   useEffect(() => {
@@ -89,6 +89,12 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, autoScroll, activeCall.liveTranscript]);
+
+
+  const handleEndCall = () => {
+    endCall(call.id, 'Resolved by Operator');
+    onClose();
+  };
 
   const handleSeize = () => {
     seizeCall(call.id);
@@ -225,6 +231,14 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
             >
               <SafeIcon icon={FiPhoneIncoming} /> {isManual ? 'Manual Control Active' : 'Seize Control'}
             </button>
+
+            <button
+              onClick={handleEndCall}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white shadow-[0_0_20px_rgba(225,29,72,0.3)] ml-3"
+            >
+              <SafeIcon icon={FiPhoneOff} /> End Call
+            </button>
+
           </div>
         </div>
       </motion.div>

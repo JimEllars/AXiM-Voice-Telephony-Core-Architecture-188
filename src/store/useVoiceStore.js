@@ -446,6 +446,7 @@ export const useVoiceStore = create((set, get) => ({
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        window.activeOperatorStream = stream;
         const audioElement = document.getElementById('live-call-audio');
         if (audioElement) {
           audioElement.srcObject = stream;
@@ -478,6 +479,20 @@ export const useVoiceStore = create((set, get) => ({
     }
 
     get().logEvent(`Call Takeover Override executed by operator [${operatorId}] on call [${id}]`, 'security', 'Voice Cockpit');
+  },
+
+  endCall: async (callId, resolutionReason = 'Operator Disconnected') => {
+    set(state => ({
+      activeCalls: state.activeCalls.filter(c => c.id !== callId)
+    }));
+
+    if (window.activeOperatorStream) {
+      window.activeOperatorStream.getTracks().forEach(t => t.stop());
+      window.activeOperatorStream = null;
+    }
+
+    get().dispatchTelemetryError('CALL_RESOLVED', resolutionReason);
+    get().logEvent(`Call [${callId}] terminated: ${resolutionReason}`, 'info', 'Voice Cockpit');
   },
 
   // --- SIMULATION ---
@@ -990,4 +1005,3 @@ export const useVoiceStore = create((set, get) => ({
   setSelectedCall: (call) => set({ selectedCallForIntervention: call }),
 
 }));
-
