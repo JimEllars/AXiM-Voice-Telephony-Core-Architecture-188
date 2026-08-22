@@ -279,8 +279,12 @@ export const useVoiceStore = create((set, get) => ({
   },
 
   executeRules: (voicemail) => {
-    const { autoRules, templates, routingSettings, entities } = get();
+    const { autoRules, templates, routingSettings, entities, activeCalls } = get();
     if (!routingSettings.autoResponseEnabled) return;
+
+    // Suppress automated rules if the caller is currently engaged with a live operator
+    const isUnderManualIntervention = activeCalls.some(call => call.callerId === voicemail.callerId && call.status === 'manual_intervention');
+    if (isUnderManualIntervention) return;
 
     autoRules.forEach(rule => {
       if (!rule.enabled) return;
@@ -922,6 +926,7 @@ export const useVoiceStore = create((set, get) => ({
     const contact = get().crmContacts.find(c => c.id === contactId);
 
     try {
+      const startTime = performance.now();
       const res = await fetch(bridgeUrl, {
         method: 'POST',
         headers: {
@@ -939,14 +944,17 @@ export const useVoiceStore = create((set, get) => ({
       });
 
       if (res.ok) {
+        const latency = (performance.now() - startTime).toFixed(0);
+        const detailsMessage = `Manual ${provider} synchronization completed successfully via CRM Bridge in ${latency}ms.`;
         const newLog = {
           id: `s_${Date.now()}`,
           contact: contact ? contact.name : contactId,
-          details: `Manual ${provider} synchronization completed successfully via CRM Bridge.`,
+          details: detailsMessage,
           time: 'Just Now'
         };
         set(state => ({ syncLogs: [newLog, ...state.syncLogs].slice(0, 50) }));
-        get().addNotification({ type: 'success', title: 'CRM Sync Complete', message: `${provider} record re-reconciled.` });
+        get().addNotification({ type: 'success', title: 'CRM Sync Complete', message: detailsMessage });
+        get().logEvent(`CRM Bridge Sync latency: ${latency}ms for provider ${provider}`, 'sync', 'CRM Bridge');
       }
     } catch (e) {
       console.error('[CRM_SYNC] Reconciliation request failed:', e);
