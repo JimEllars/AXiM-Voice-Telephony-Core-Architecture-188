@@ -73,6 +73,9 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
   useEffect(() => {
     if (isActive) {
       if (isLive) {
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume();
+        }
         initAudio().then(() => {
           if (requestRef.current) cancelAnimationFrame(requestRef.current);
           requestRef.current = requestAnimationFrame(animateLive);

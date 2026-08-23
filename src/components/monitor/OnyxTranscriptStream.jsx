@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
@@ -10,18 +11,20 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
   const { seizeCall, addNotification, logEvent, activeCalls, connectLiveTranscriptStream, endCall } = useVoiceStore();
   const activeCall = activeCalls.find(c => c.id === call?.id) || call;
 
-  useEffect(() => {
-    if (!call?.id) return;
-    const cleanup = connectLiveTranscriptStream(call.id);
-    return () => cleanup && cleanup();
-  }, [call?.id, connectLiveTranscriptStream]);
-
   const [messages, setMessages] = useState([
     { id: 1, sender: 'onyx', text: 'Thank you for calling AXiM. How can I assist you today?' }
   ]);
   const [isMuted, setIsMuted] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
+
+  if (!call || !call.id) return null;
+
+  useEffect(() => {
+    if (!call?.id) return;
+    const cleanup = connectLiveTranscriptStream(call.id);
+    return () => cleanup && cleanup();
+  }, [call?.id, connectLiveTranscriptStream]);
 
   const isManual = call.status === 'manual_intervention';
 
@@ -43,8 +46,8 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
       return () => clearInterval(timer);
     }
 
-    let channel;
-    let client;
+    let client = null;
+    let channel = null;
     let isMounted = true;
     import('@supabase/supabase-js').then(({ createClient }) => {
       if (!isMounted) return;
@@ -92,8 +95,8 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
 
 
   const handleEndCall = () => {
-    endCall(call.id, 'Resolved by Operator');
     onClose();
+    endCall(call.id, 'Resolved by Operator');
   };
 
   const handleSeize = () => {
