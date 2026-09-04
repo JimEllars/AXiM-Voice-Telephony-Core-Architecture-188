@@ -122,6 +122,17 @@ export const OnyxTranscriptStream = ({ call, onClose }) => {
                 <Badge variant={isManual ? 'success' : 'cyber'} className="animate-pulse">
                   {isManual ? 'Manual Override' : 'Live Observation'}
                 </Badge>
+                {activeCall.wsStatus === 'reconnecting' ? (
+                  <div className="text-[10px] text-amber-400 font-mono flex items-center gap-1.5 bg-amber-950/40 border border-amber-900/50 px-2 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Reconnecting Stream...
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-900/50 px-2 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Duplex
+                  </div>
+                )}
                 <div className="text-[10px] text-indigo-400 font-mono flex items-center gap-1.5 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
                   STT: @CF/OPENAI/WHISPER

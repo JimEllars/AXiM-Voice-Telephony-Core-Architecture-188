@@ -23,6 +23,8 @@ export const useVoiceStore = create((set, get) => ({
     { id: 'fr_1', name: 'Global Spam Block', enabled: true, type: 'Heuristic', target: 'Global', action: 'Drop' }
   ],
   activeCalls: [],
+  currentUser: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
   crmContacts: [
     { id: "c1", name: "John Doe", company: "Acme Corp", phone: "+1 555-0101", status: "Active", lastInteraction: "10 mins ago" },
     { id: "c2", name: "Sarah Smith", company: "Globex", phone: "+1 555-0102", status: "Inactive", lastInteraction: "2 days ago" }

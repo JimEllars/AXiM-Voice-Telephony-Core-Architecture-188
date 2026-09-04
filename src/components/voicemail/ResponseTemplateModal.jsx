@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SafeIcon from '../../common/SafeIcon';
 import { FiX, FiMessageSquare, FiMail, FiCheck, FiDatabase, FiAlertTriangle, FiArrowRight } from 'react-icons/fi';
 import { useVoiceStore } from '../../store/useVoiceStore';
+import { dispatchCrmEgress } from '../../services/triageEngine';
+import { extractEntityData } from '../../services/extractionEngine';
 import { Badge } from '../common/Badge';
 
 export const ResponseTemplateModal = ({ voicemail, onClose }) => {
@@ -61,15 +63,39 @@ export const ResponseTemplateModal = ({ voicemail, onClose }) => {
 
   const handleAction = (type, detail) => {
     setIsProcessing(true);
-    setTimeout(() => {
-      executeFollowUp(voicemail.id, { type, detail, status: 'completed' });
-      setIsProcessing(false);
-      setSuccessMsg(`Action Dispatched: ${type}`);
+    if (type === 'CRM_TASK') {
+      const extracted = extractEntityData(voicemail.transcript);
+      dispatchCrmEgress(voicemail, extracted, 'triaged')
+        .then(() => {
+          executeFollowUp(voicemail.id, { type, detail, status: 'completed' });
+          setIsProcessing(false);
+          setSuccessMsg('CRM Lead Converted Successfully');
+          setTimeout(() => {
+            setSuccessMsg('');
+            onClose();
+          }, 1500);
+        })
+        .catch(() => {
+          // Fallback to local
+          executeFollowUp(voicemail.id, { type, detail, status: 'completed' });
+          setIsProcessing(false);
+          setSuccessMsg('Action Dispatched Locally (CRM Egress Failed)');
+          setTimeout(() => {
+            setSuccessMsg('');
+            onClose();
+          }, 1500);
+        });
+    } else {
       setTimeout(() => {
-        setSuccessMsg('');
-        if (type === 'SMS' || type === 'Email') onClose();
-      }, 1500);
-    }, 1000);
+        executeFollowUp(voicemail.id, { type, detail, status: 'completed' });
+        setIsProcessing(false);
+        setSuccessMsg(`Action Dispatched: ${type}`);
+        setTimeout(() => {
+          setSuccessMsg('');
+          if (type === 'SMS' || type === 'Email') onClose();
+        }, 1500);
+      }, 1000);
+    }
   };
 
   return (

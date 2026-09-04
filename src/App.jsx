@@ -18,6 +18,8 @@ import { CommunicationHub } from './pages/CommunicationHub';
 import { LiveMonitor } from './pages/LiveMonitor';
 import { NotificationToast } from './components/layout/NotificationToast';
 import { DeskeraSync } from './pages/DeskeraSync';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AuthCallback } from './components/auth/AuthCallback';
 
 function App() {
   const cleanupStaleCalls = useVoiceStore(state => state.cleanupStaleCalls);
@@ -46,6 +48,7 @@ function App() {
             
             <div className="max-w-7xl mx-auto">
               <Routes>
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/live" element={<LiveMonitor />} />
                 <Route path="/voicemails" element={<Voicemails />} />
@@ -55,11 +58,11 @@ function App() {
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/nodes" element={<Nodes />} />
                 <Route path="/agents" element={<Agents />} />
-                <Route path="/security" element={<AsguardFirewall />} />
+                <Route path="/security" element={<ProtectedRoute requireRole={['admin', 'supervisor']}><AsguardFirewall /></ProtectedRoute>} />
                 <Route path="/crm-health" element={<CrmSyncHealth />} />
                 <Route path="/crm-sync" element={<NexusSync />} />
                 <Route path="/deskera" element={<DeskeraSync />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<ProtectedRoute requireRole={['admin', 'supervisor']}><Settings /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>

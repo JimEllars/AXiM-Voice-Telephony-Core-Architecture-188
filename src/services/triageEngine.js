@@ -76,3 +76,37 @@ export const analyzeTranscript = (transcript) => {
     analyzedAt: new Date().toISOString()
   };
 };
+export const dispatchCrmEgress = async (voicemail, extractedEntities, status = 'triaged') => {
+  try {
+    const apiUrl = import.meta.env.VITE_CORE_API_URL || 'https://api.axim.us.com';
+    const payload = {
+      voicemailId: voicemail.id,
+      callerId: voicemail.callerId,
+      extractedEntities,
+      assignedDepartment: voicemail.classification,
+      status
+    };
+
+    // Using a mocked signature string for illustration,
+    // real implementation would hash payload with secret.
+    const signature = 'sha256=' + Date.now().toString(16);
+
+    const res = await fetch(`${apiUrl}/api/v1/telephony/triage-egress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Axim-Signature': signature
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to dispatch CRM egress: ${res.statusText}`);
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error('[CRM_EGRESS_ERROR]', error);
+    throw error;
+  }
+};
