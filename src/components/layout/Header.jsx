@@ -1,3 +1,5 @@
+import { clearAuthToken, clearUser, redirectToLogin, getUser } from '../../lib/auth';
+import { FiLogOut } from 'react-icons/fi';
 import React from 'react';
 import { AgentPresence } from '../hud/AgentPresence';
 import SafeIcon from '../../common/SafeIcon';
@@ -87,6 +89,25 @@ export const Header = () => {
           
           <div className="w-px h-6 bg-zinc-800"></div>
           
+
+          <div className="hidden lg:flex items-center gap-3 mr-2">
+            <div className="flex flex-col items-end text-right">
+              <span className="text-xs font-bold text-zinc-100">{getUser()?.name || 'Operator'}</span>
+              <span className="text-[10px] text-zinc-500 font-mono">{getUser()?.extension || 'EXT-000'}</span>
+            </div>
+            <button
+              onClick={() => {
+                clearAuthToken();
+                clearUser();
+                redirectToLogin();
+              }}
+              className="p-1.5 text-zinc-500 hover:text-rose-400 bg-zinc-900 border border-zinc-800 rounded-lg transition-colors ml-2"
+              title="Logout"
+            >
+              <SafeIcon icon={FiLogOut} className="text-sm" />
+            </button>
+          </div>
+
           <AgentPresence />
         </div>
       </header>

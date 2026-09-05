@@ -22,7 +22,13 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
 
       if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
         // Get microphone access
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (mediaErr) {
+          console.warn("Microphone access denied or unavailable, falling back to synthetic", mediaErr);
+          throw new Error('Mic access denied'); // Throw to trigger fallback
+        }
         streamRef.current = stream;
 
         if (sourceRef.current) {
@@ -37,6 +43,9 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
       }
     } catch (err) {
       console.warn("Audio initialization failed:", err);
+      // Fallback to synthetic if hardware permissions restrict it
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      requestRef.current = requestAnimationFrame(animateSynthetic);
     }
   };
 
