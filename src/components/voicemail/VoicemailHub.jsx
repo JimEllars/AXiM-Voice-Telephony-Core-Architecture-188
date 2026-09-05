@@ -1,14 +1,30 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useVoiceStore } from '../../store/useVoiceStore';
 import { TranscriptCard } from './TranscriptCard';
 import SafeIcon from '../../common/SafeIcon';
 import { FiInbox, FiSearch, FiX, FiFilter, FiRefreshCw } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getUser } from '../../lib/auth';
 
 export const VoicemailHub = () => {
   const { voicemails, fetchVoicemails } = useVoiceStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(() => localStorage.getItem('axim_voicemail_filter') || 'All Queues');
+
+  useEffect(() => {
+    localStorage.setItem('axim_voicemail_filter', activeFilter);
+  }, [activeFilter]);
+
+  const user = getUser();
+  const isAdminOrSuper = user?.role === 'admin' || user?.role === 'supervisor';
+
+  const filterOptions = ['My Extension', 'My Department'];
+  if (isAdminOrSuper) {
+    filterOptions.push('All Queues');
+  } else if (activeFilter === 'All Queues') {
+    setActiveFilter('My Extension');
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -17,11 +33,26 @@ export const VoicemailHub = () => {
   };
 
   const filteredVoicemails = useMemo(() => {
-    return voicemails.filter(vm => 
+    let filtered = voicemails;
+    if (activeFilter === 'My Extension') {
+      filtered = filtered.filter(vm => vm.assigned_agent === user?.id || vm.extension === user?.extension);
+    } else if (activeFilter === 'My Department') {
+      filtered = filtered.filter(vm => vm.department === user?.department);
+    }
+
+    return filtered.filter(vm =>
       vm.callerId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vm.transcript.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [voicemails, searchQuery]);
+  }, [voicemails, searchQuery, activeFilter, user]);
+
+  const counts = useMemo(() => {
+    return {
+      'My Extension': voicemails.filter(vm => vm.assigned_agent === user?.id || vm.extension === user?.extension).length,
+      'My Department': voicemails.filter(vm => vm.department === user?.department).length,
+      'All Queues': voicemails.length
+    };
+  }, [voicemails, user]);
 
   return (
     <div className="space-y-6">
@@ -67,6 +98,18 @@ export const VoicemailHub = () => {
             <SafeIcon icon={FiFilter} />
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-2">
+        {filterOptions.map(option => (
+          <button
+            key={option}
+            onClick={() => setActiveFilter(option)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${activeFilter === option ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50' : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800'}`}
+          >
+            {option} <span className="ml-1 opacity-70">({counts[option] || 0})</span>
+          </button>
+        ))}
       </div>
 
       {filteredVoicemails.length > 0 ? (
