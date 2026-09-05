@@ -1,12 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVoiceStore } from '../../store/useVoiceStore';
 import SafeIcon from '../../common/SafeIcon';
-import { FiPhone, FiActivity, FiEye } from 'react-icons/fi';
+import { FiPhone, FiActivity, FiEye, FiHeadphones, FiMic, FiXSquare } from 'react-icons/fi';
 import { Badge } from '../common/Badge';
+import { getUser } from '../../lib/auth';
 
 export const LiveCallMonitor = () => {
-  const { activeCalls, setSelectedCall, seizeCall } = useVoiceStore();
+  const { activeCalls, setSelectedCall, seizeCall, addNotification } = useVoiceStore();
+  const user = getUser();
+  const [monitoringState, setMonitoringState] = useState({});
+
+  const handleSupervisoryAction = async (callId, action) => {
+    try {
+      const workerUrl = import.meta.env.VITE_TELEPHONY_WORKER_URL || 'https://api.axim.us.com';
+      const response = await fetch(`${workerUrl}/api/v1/telephony/calls/${callId}/supervise`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action, supervisorId: user?.id })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      let stateMessage = '';
+      if (action === 'listen') stateMessage = 'Listening In';
+      if (action === 'whisper') stateMessage = 'Whispering';
+      if (action === 'barge') stateMessage = 'Take Over Active';
+      if (action === 'hangup') stateMessage = 'Terminating Call';
+
+      setMonitoringState(prev => ({ ...prev, [callId]: stateMessage }));
+
+      addNotification({
+        type: 'success',
+        title: 'Supervisory Action',
+        message: `Successfully executed ${action} on call.`
+      });
+
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Action Failed',
+        message: `Failed to execute ${action}: ${error.message}`
+      });
+    }
+  };
 
   const formatDuration = (seconds) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -57,7 +96,9 @@ export const LiveCallMonitor = () => {
                     <div className="text-xs text-zinc-500 mt-0.5">{call.crmMatch || 'Unmatched Entity'}</div>
                   </td>
                   <td className="px-5 py-4">
-                    {call.status === 'ringing' ? (
+                    {monitoringState[call.id] ? (
+                      <Badge variant="cyber">{monitoringState[call.id]}</Badge>
+                    ) : call.status === 'ringing' ? (
                       <Badge variant="warning" className="animate-pulse">Ringing</Badge>
                     ) : (
                       <Badge variant="success">Onyx Mk3 Active</Badge>
@@ -71,25 +112,39 @@ export const LiveCallMonitor = () => {
                   <td className="px-5 py-4 font-mono text-zinc-300">
                     {formatDuration(call.duration)}
                   </td>
-                  <td className="px-5 py-4 text-right flex justify-end gap-2">
+                  <td className="px-5 py-4 text-right flex justify-end gap-1 flex-wrap w-48">
                     <button 
-                      onClick={() => setSelectedCall(call)}
+                      onClick={() => handleSupervisoryAction(call.id, 'listen')}
                       disabled={call.status === 'ringing'}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md border border-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Listen In"
+                      className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md border border-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <SafeIcon icon={FiEye} />
-                      Observe
+                      <SafeIcon icon={FiHeadphones} />
                     </button>
-                    {call.status !== 'manual_intervention' && (
-                      <button
-                        onClick={() => seizeCall(call.id)}
-                        disabled={call.status === 'ringing'}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-medium rounded-md border border-indigo-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <SafeIcon icon={FiPhone} />
-                        Seize Call
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleSupervisoryAction(call.id, 'whisper')}
+                      disabled={call.status === 'ringing'}
+                      title="Whisper"
+                      className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md border border-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <SafeIcon icon={FiMic} />
+                    </button>
+                    <button
+                      onClick={() => handleSupervisoryAction(call.id, 'barge')}
+                      disabled={call.status === 'ringing'}
+                      title="Take Over"
+                      className="p-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-xs font-medium rounded-md border border-indigo-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <SafeIcon icon={FiPhone} />
+                    </button>
+                    <button
+                      onClick={() => handleSupervisoryAction(call.id, 'hangup')}
+                      disabled={call.status === 'ringing'}
+                      title="Terminate"
+                      className="p-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-300 text-xs font-medium rounded-md border border-red-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <SafeIcon icon={FiXSquare} />
+                    </button>
                   </td>
                 </motion.tr>
               ))}
