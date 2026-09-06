@@ -23,3 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Phase A
+push.sh
+submit.py
+run_submit.js
+branch_info.txt
+*.log
