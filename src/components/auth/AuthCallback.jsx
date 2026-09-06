@@ -15,19 +15,37 @@ export const AuthCallback = () => {
     if (token) {
       setAuthToken(token);
 
-      // Simulate validating token and getting user
-      const user = {
-        name: 'Operator Beta',
-        role: 'admin',
-        extension: 'EXT-402',
-      };
+      // Validate token against Passport
+      fetch('https://passport.axim.us.com/api/v1/auth/verify-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ token })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Invalid token');
+        return res.json();
+      })
+      .then(data => {
+        const user = data.user || {
+          name: 'Operator Beta',
+          role: 'admin',
+          extension: 'EXT-402',
+        };
+        setUser(user);
+        setCurrentUser(user);
+        window.history.replaceState({}, document.title, '/');
+        navigate('/', { replace: true });
+      })
+      .catch(err => {
+        console.error('Passport SSO verification failed:', err);
+        // Fallback or reject
+        window.history.replaceState({}, document.title, '/');
+        navigate('/', { replace: true });
+      });
 
-      setUser(user);
-      setCurrentUser(user);
-
-      // Clean browser history
-      window.history.replaceState({}, document.title, '/');
-      navigate('/', { replace: true });
     } else {
       navigate('/', { replace: true });
     }

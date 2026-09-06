@@ -4,11 +4,13 @@ compatibility_date = "2023-10-30"
 
 kv_namespaces = [
   { binding = "TELEPHONY_STATE_KV", id = "preview_id1", preview_id = "preview_id1" },
-  { binding = "ASGUARD_THREAT_CACHE_KV", id = "preview_id2", preview_id = "preview_id2" }
+  { binding = "ASGUARD_THREAT_CACHE_KV", id = "preview_id2", preview_id = "preview_id2" },
+  { binding = "VOICE_DLQ_KV", id = "preview_id3", preview_id = "preview_id3" },
+  { binding = "VOICE_STATE_KV", id = "preview_id4", preview_id = "preview_id4" }
 ]
 
 [triggers]
 crons = ["0 13 * * *"] # 8:00 AM EST / 13:00 UTC daily
 
 # Secrets to be set in Cloudflare:
-# TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, AXIM_SERVICE_KEY, EMAILIT_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, AXIM_SERVICE_KEY, EMAILIT_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AXIM_INTERNAL_KEY
