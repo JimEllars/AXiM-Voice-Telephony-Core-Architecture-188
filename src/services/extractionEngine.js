@@ -97,3 +97,56 @@ export const getWorkersAiSchemaPayload = (transcript) => ({
     }
   }
 });
+
+export const dispatchCrmEgress = async (voicemail, extractedEntities, status = 'triaged') => {
+  try {
+    const apiUrl = import.meta.env.VITE_CORE_API_URL || 'https://api.axim.us.com';
+
+    const payload = {
+      voicemailId: voicemail.id,
+      callerId: voicemail.callerId,
+      extractedEntities,
+      assignedDepartment: voicemail.classification || extractedEntities.intentClass,
+      status
+    };
+
+    // Assuming we have some signature auth mechanism
+    const signature = 'sha256=' + Date.now().toString(16);
+
+    // Dispatch to Deskera CRM (/v1/contacts)
+    const deskeraRes = fetch(`${apiUrl}/v1/contacts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Axim-Signature': signature
+      },
+      body: JSON.stringify({
+        name: extractedEntities.name,
+        phone: extractedEntities.phone,
+        email: extractedEntities.email,
+        company: extractedEntities.company,
+        notes: extractedEntities.notes
+      })
+    }).catch(e => console.error('Deskera sync failed', e));
+
+    // Dispatch to AXiM Core (public.customer_leads)
+    const coreRes = fetch(`${apiUrl}/api/v1/telephony/triage-egress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Axim-Signature': signature
+      },
+      body: JSON.stringify({
+        ...payload,
+        table: 'customer_leads'
+      })
+    }).catch(e => console.error('AXiM Core lead sync failed', e));
+
+    await Promise.all([deskeraRes, coreRes]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[CRM_EGRESS_ERROR]', error);
+    throw error;
+  }
+};

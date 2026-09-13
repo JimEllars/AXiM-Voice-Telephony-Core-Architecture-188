@@ -20,24 +20,36 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
-    if (method === 'POST' && path === '/api/v1/telephony/ingress') {
-      return handleIngress(request, env, ctx);
-    }
+    try {
+      if (method === 'POST' && path === '/api/v1/telephony/ingress') {
+        return await handleIngress(request, env, ctx);
+      }
 
-    if (method === 'POST' && path === '/api/v1/telephony/voicemail') {
-      return handleVoicemail(request, env, ctx);
-    }
+      if (method === 'POST' && path === '/api/v1/telephony/voicemail') {
+        return await handleVoicemail(request, env, ctx);
+      }
 
-    const superviseMatch = path.match(/^\/api\/v1\/telephony\/calls\/(.+)\/supervise$/);
-    if (method === 'POST' && superviseMatch) {
-      return handleSupervise(request, env, superviseMatch[1]);
-    }
+      const superviseMatch = path.match(/^\/api\/v1\/telephony\/calls\/(.+)\/supervise$/);
+      if (method === 'POST' && superviseMatch) {
+        return await handleSupervise(request, env, superviseMatch[1]);
+      }
 
-    if (method === 'GET' && path === '/api/v1/voicemail/action') {
-      return handleVoicemailAction(request, env);
-    }
+      if (method === 'GET' && path === '/api/v1/voicemail/action') {
+        return await handleVoicemailAction(request, env);
+      }
 
-    return new Response('Not Found', { status: 404 });
+      return new Response('Not Found', { status: 404 });
+    } catch (err) {
+      console.error('Edge worker error:', err);
+      // Fallback TwiML
+      const twiml = `<Response>
+  <Say voice="Polly.Danielle">Thank you for calling AXiM Systems. Please leave a message after the tone.</Say>
+  <Record action="/voicemail" maxLength="120" playBeep="true"/>
+</Response>`;
+      return new Response(twiml, {
+        headers: { 'Content-Type': 'text/xml' }
+      });
+    }
   },
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
@@ -46,42 +58,86 @@ export default {
 };
 
 async function handleIngress(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  const formData = await request.formData().catch(() => new FormData());
-  const from = formData.get('From') as string;
+  const twilioSignature = request.headers.get('X-Twilio-Signature');
+  const url = request.url;
 
-  if (from) {
-    const threatStatus = await env.ASGUARD_THREAT_CACHE_KV.get(`threat:${from}`);
-    if (threatStatus === 'malicious' || threatStatus === 'spam') {
-      return new Response('<Response><Reject/></Response>', {
-        headers: { 'Content-Type': 'text/xml' }
-      });
+  const formData = await request.formData().catch(() => new FormData());
+  const params: Record<string, string> = {};
+  formData.forEach((value, key) => {
+    params[key] = value.toString();
+  });
+
+  if (env.TWILIO_AUTH_TOKEN && twilioSignature) {
+    const isValid = await validateTwilioRequest(env.TWILIO_AUTH_TOKEN, twilioSignature, url, params);
+    if (!isValid) {
+      return new Response('Forbidden', { status: 403 });
     }
   }
 
-  // We should also trigger the event for completed calls, but ingress is for incoming ones.
-  // We'll hook into call completion via a status callback endpoint if provided, or assume
-  // for the sake of the prompt that we should at least trigger ecosystem events.
-  // For now, let's also pass the ecosystem dispatch to ctx.waitUntil() for ingress to satisfy call tracking if it acts as a webhook.
-  const payload = {
-    event: 'call_ingress',
-    from: from,
-    timestamp: new Date().toISOString()
-  };
+  const from = params['From'];
 
-  // NOTE: According to instructions, dispatch ecosystem event on call AND voicemail completion.
-  // Typically call completion comes via another endpoint (like status callback). We will assume the instructions
-  // mean we should dispatch it if we get a call completed status, but if that endpoint is missing, we dispatch on ingress just to be safe.
-  const callStatus = formData.get('CallStatus') as string;
+  // Asguard Firewall Check
+  if (from) {
+    const blockedStr = await env.ASGUARD_THREAT_CACHE_KV.get(`block:${from}`);
+    if (blockedStr) {
+      // Dispatch telemetry event for blocked threat
+      ctx.waitUntil(
+        fetch('https://api.axim.us.com/api/v1/telemetry/ingest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Axim-Signature': env.AXIM_INTERNAL_KEY || 'dev-key'
+          },
+          body: JSON.stringify({
+            event_type: 'telephony_threat_blocked',
+            phone_number: from,
+            timestamp: new Date().toISOString()
+          })
+        }).catch(e => console.error('Failed to dispatch threat telemetry', e))
+      );
+
+      const twiml = `<Response><Reject reason="busy"/></Response>`;
+      return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
+    }
+  }
+
+  const callStatus = params['CallStatus'];
   if (callStatus === 'completed' || callStatus === 'failed' || callStatus === 'canceled' || callStatus === 'no-answer') {
-     ctx.waitUntil(ctx_dispatchEcosystemEvents(Object.fromEntries(formData), env));
+     ctx.waitUntil(ctx_dispatchEcosystemEvents(params, env));
   }
 
   const host = new URL(request.url).host;
-  const twiml = `<Response><Connect><Stream url="wss://${host}/media-stream"/></Connect></Response>`;
+  let twiml = `<Response><Connect><Stream url="wss://${host}/media-stream"/></Connect></Response>`;
+
+  // Wrap in try-catch to allow graceful fallback for downstream errors if needed, though Connect stream usually handles itself.
+  // The fallback is primarily requested if downstream transcription/db timeouts occur.
+  // We'll prepare a fallback block if something throws.
 
   return new Response(twiml, {
     headers: { 'Content-Type': 'text/xml' }
   });
+}
+
+async function validateTwilioRequest(authToken: string, signature: string, url: string, params: Record<string, string>): Promise<boolean> {
+  const sortedKeys = Object.keys(params).sort();
+  let data = url;
+  for (const key of sortedKeys) {
+    data += key + params[key];
+  }
+
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(authToken),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+
+  const mac = await crypto.subtle.sign('HMAC', keyMaterial, encoder.encode(data));
+  const base64Mac = btoa(String.fromCharCode(...new Uint8Array(mac)));
+
+  return base64Mac === signature;
 }
 
 async function handleVoicemail(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -106,6 +162,20 @@ async function handleVoicemail(request: Request, env: Env, ctx: ExecutionContext
     } catch (e) {
       console.error('Failed to save voicemail to Supabase', e);
     }
+  }
+
+  // Dispatch transcription
+  if (body.RecordingUrl) {
+    ctx.waitUntil(
+      fetch('https://api.axim.us.com/functions/v1/axim-transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Axim-Signature': env.AXIM_INTERNAL_KEY || 'dev-key'
+        },
+        body: JSON.stringify({ audioUrl: body.RecordingUrl, voicemailId: body.id || body.CallSid })
+      }).catch(e => console.error('Failed to dispatch transcription', e))
+    );
   }
 
   // Dispatch event to AXiM Core and Onyx AI using ctx.waitUntil to prevent premature abort

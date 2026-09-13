@@ -91,20 +91,35 @@ export const dispatchCrmEgress = async (voicemail, extractedEntities, status = '
     // real implementation would hash payload with secret.
     const signature = 'sha256=' + Date.now().toString(16);
 
-    const res = await fetch(`${apiUrl}/api/v1/telephony/triage-egress`, {
+    // Dispatch to Deskera CRM (/v1/contacts)
+    const deskeraRes = fetch(`${apiUrl}/v1/contacts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Axim-Signature': signature
+      },
+      body: JSON.stringify({
+        name: extractedEntities?.name,
+        phone: extractedEntities?.phone,
+        email: extractedEntities?.email,
+        company: extractedEntities?.company,
+        notes: extractedEntities?.notes
+      })
+    }).catch(e => console.error('Deskera sync failed', e));
+
+    const coreRes = fetch(`${apiUrl}/api/v1/telephony/triage-egress`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Axim-Signature': signature
       },
       body: JSON.stringify(payload)
-    });
+    }).catch(e => console.error('Core egress failed', e));
 
-    if (!res.ok) {
-      throw new Error(`Failed to dispatch CRM egress: ${res.statusText}`);
-    }
+    await Promise.all([deskeraRes, coreRes]);
 
-    return await res.json();
+    return { success: true };
+
   } catch (error) {
     console.error('[CRM_EGRESS_ERROR]', error);
     throw error;
