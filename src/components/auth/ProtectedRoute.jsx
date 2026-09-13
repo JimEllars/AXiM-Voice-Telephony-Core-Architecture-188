@@ -26,6 +26,15 @@ export const ProtectedRoute = ({ children, requireRole }) => {
     );
   }
 
+  // Allow access for specific roles related to telephony management
+  const allowedRoles = ['telephony', 'support', 'admin', 'super_user'];
+
+  if (!role || !allowedRoles.includes(role)) {
+    // If not one of the allowed roles, deny access and send to login/root
+    redirectToLogin();
+    return null; // Return null so the navigation takes over
+  }
+
   if (requireRole && requireRole.length > 0) {
     if (!requireRole.includes(role)) {
       return <Navigate to="/" replace />;
