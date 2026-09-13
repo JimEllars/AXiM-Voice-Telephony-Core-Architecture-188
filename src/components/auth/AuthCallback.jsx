@@ -29,11 +29,18 @@ export const AuthCallback = () => {
         return res.json();
       })
       .then(data => {
-        const user = data.user || {
+        let user = data.user || {
           name: 'Operator Beta',
           role: 'admin',
           extension: 'EXT-402',
+          email: 'unknown@example.com'
         };
+
+        // Super User privileges
+        if (user.email === 'james.ellars@axim.us.com' || user.email === 'jrellars@gmail.com') {
+          user.role = 'super_user';
+        }
+
         setUser(user);
         setCurrentUser(user);
         window.history.replaceState({}, document.title, '/');

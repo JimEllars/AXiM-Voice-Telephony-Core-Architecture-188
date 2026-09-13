@@ -59,5 +59,5 @@ export const clearUser = () => {
 };
 
 export const redirectToLogin = () => {
-  window.location.href = `https://passport.axim.us.com/login?redirect=${encodeURIComponent(window.location.origin + '/auth/callback')}`;
+  window.location.href = `https://passport.axim.us.com/login?redirect_uri=https://voice.axim.us.com/auth/callback&app_id=voice`;
 };

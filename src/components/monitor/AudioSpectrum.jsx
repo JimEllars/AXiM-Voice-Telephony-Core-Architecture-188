@@ -119,6 +119,21 @@ export const AudioSpectrum = ({ isActive, isLive }) => {
     };
   }, [isActive, isLive]);
 
+const handleUserInteraction = () => {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(console.error);
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('click', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, []);
+
   // Clean up audio context on unmount
   useEffect(() => {
     return () => {
